@@ -148,11 +148,13 @@ to go
   ]
   if (anno = 2016 + durata_impianti + 1   and time = 2 );fine simulazione
   [ 
-    update_plot_roe
+    ;; update_plot_roe
     aggiorna_incentivi_prod
     aggiorna_incentivi_tot
     stampa_agenti
     stampa_resoconto
+    update_plot_roe
+    print_simulation_info
     output-print (word "--------------------------------------------------------------------------------------------------------------------------------------------------------")
     output-print (word "---------------------------------------------------------------------FINE SIMULAZIONE-------------------------------------------------------------------")
     output-print (word "--------------------------------------------------------------------------------------------------------------------------------------------------------")
@@ -1627,7 +1629,8 @@ end
 to calcola_roi_roe
  ; (costo_impianto - ifin + intRegione)  
   set roi% precision ((((flusso_cassa_cumulato - ((costo_impianto - ifin + intRegione) - importo_prestito ))  / ( costo_impianto - ifin + intRegione + 0.01 ) ) * 100 ) / durata_impianti )  3
-  set roe% precision ((((flusso_cassa_cumulato - ((costo_impianto - ifin + intRegione) - importo_prestito )) / ( (costo_impianto - ifin + intRegione + 0.01 ) - importo_prestito) ) * 100 ) / durata_impianti ) 3
+  ;; set roe% precision ((((flusso_cassa_cumulato - ((costo_impianto - ifin + intRegione) - importo_prestito )) / ( (costo_impianto - ifin + intRegione + 0.01 ) - importo_prestito) ) * 100 ) / durata_impianti ) 3
+  set roe% precision ((((flusso_cassa_cumulato - ((costo_impianto + intRegione) - importo_prestito )) / ( (costo_impianto + intRegione + 0.01 ) - importo_prestito) ) * 100 ) / durata_impianti ) 3
 end
 
 ;; SET UP GRAFICO PBT
@@ -1684,6 +1687,61 @@ to update_plot_roe
       output-print ( word "Media ROE anno  "cry " :  " g "%" )
     ]  
 end
+
+;; stampa valori medi di parametri come il roe_stimato degli agenti, il flusso cumulato, etc.. e altri valori utili in fase di debug
+to print_simulation_info
+  let i 0
+  let cry 0
+  let avg_roe_stimato 0
+  let avg_stima_ric_incentivo 0
+  let avg_stima_ric_autoconsumo 0
+  let avg_stima_ric_vendita 0
+  let avg_stima_van 0
+  let avg_stima_kw_immessi 0
+  let avg_stima_kw_prelevati 0
+  let avg_stima_kw_autoconsumo 0
+  let avg_stima_consumo_medio_annuale 0
+  let avg_stima_kw_annui_impianto 0
+  let avg_stima_flusso_cassa_cumulato 0
+  let avg_costo_impianto 0
+  let avg_ifin 0 ;; valore poco indicativo: nella media sommo anche i valori nulli relativi a chi non ha richiesto l'incentivo regionale
+  
+  output-print ( word "***************************************************DATI ROE STIMATO*****************************************") 
+  while [i <= 4]
+    [
+      set avg_roe_stimato precision ( (sum [roe_stimato] of pf with  [anno_realizzazione = 2012 + i ] ) / (NAgentiFINAL * 2 ) ) 3
+      set avg_stima_ric_incentivo precision ( (sum [stima_ric_incentivo] of pf with  [anno_realizzazione = 2012 + i ] ) / (NAgentiFINAL * 2 ) ) 3
+      set avg_stima_ric_autoconsumo precision ( (sum [stima_ric_autoconsumo] of pf with  [anno_realizzazione = 2012 + i ] ) / (NAgentiFINAL * 2 ) ) 3
+      set avg_stima_ric_vendita precision ( (sum [stima_ric_vendita] of pf with  [anno_realizzazione = 2012 + i ] ) / (NAgentiFINAL * 2 ) ) 3
+      set avg_stima_van precision ( (sum [stima_van] of pf with  [anno_realizzazione = 2012 + i ] ) / (NAgentiFINAL * 2 ) ) 3
+      set avg_stima_kw_immessi precision ( (sum [stima_kw_immessi] of pf with  [anno_realizzazione = 2012 + i ] ) / (NAgentiFINAL * 2 ) ) 3
+      set avg_stima_kw_prelevati precision ( (sum [stima_kw_prelevati] of pf with  [anno_realizzazione = 2012 + i ] ) / (NAgentiFINAL * 2 ) ) 3
+      set avg_stima_kw_autoconsumo precision ( (sum [stima_kw_autoconsumo] of pf with  [anno_realizzazione = 2012 + i ] ) / (NAgentiFINAL * 2 ) ) 3
+      set avg_stima_flusso_cassa_cumulato precision ( (sum [stima_flusso_cassa_cumulato] of pf with  [anno_realizzazione = 2012 + i ] ) / (NAgentiFINAL * 2 ) ) 3
+      set avg_stima_consumo_medio_annuale precision ( (sum [stima_consumo_medio_annuale] of pf with  [anno_realizzazione = 2012 + i ] ) / (NAgentiFINAL * 2 ) ) 3
+      set avg_stima_kw_annui_impianto precision ( (sum [stima_kw_annui_impianto] of pf with  [anno_realizzazione = 2012 + i ] ) / (NAgentiFINAL * 2 ) ) 3
+      set avg_costo_impianto precision ( (sum [costo_impianto] of pf with  [anno_realizzazione = 2012 + i ] ) / (NAgentiFINAL * 2 ) ) 3
+      set avg_ifin precision ( (sum [ifin] of pf with  [anno_realizzazione = 2012 + i ] ) / (NAgentiFINAL * 2 ) ) 3
+      set cry 2012 + i 
+      set i i + 1
+      output-print ( word "-------- " cry "---------") 
+      output-print ( word "avg_roe_stimato:  " avg_roe_stimato "%" )
+      output-print ( word "avg_stima_flusso_cassa_cumulato:  " avg_stima_flusso_cassa_cumulato )
+      output-print ( word "avg_costo_impianto:  " avg_costo_impianto )
+      output-print ( word "avg_ifin (sottostimato):  " avg_ifin )
+      output-print ( word "avg_stima_ric_incentivo:  " avg_stima_ric_incentivo )
+      output-print ( word "avg_stima_ric_autoconsumo:  " avg_stima_ric_autoconsumo )
+      output-print ( word "avg_stima_ric_vendita:  " avg_stima_ric_vendita )
+      output-print ( word "avg_stima_van:  " avg_stima_van )
+      output-print ( word "avg_stima_kw_immessi:  " avg_stima_kw_immessi )
+      output-print ( word "avg_stima_kw_prelevati:  " avg_stima_kw_prelevati )
+      output-print ( word "avg_stima_kw_autoconsumo:  " avg_stima_kw_autoconsumo )
+      output-print ( word "avg_stima_consumo_medio_annuale:  " avg_stima_consumo_medio_annuale )
+      output-print ( word "avg_stima_kw_annui_impianto:  " avg_stima_kw_annui_impianto )
+      
+    ]  
+end
+
 
 ;; AGGIORNA I COSTI SOSTENUTI PER GLI INCENTIVI SULLA PRODUZIONE (una finezza incredibile!!)
 to aggiorna_incentivi_prod
@@ -1815,35 +1873,44 @@ end
 ;; STAMPA DATI DEGLI AGENTI....VARIARE IN BASE ALL'INTERESSE
 to stampa_agenti
   ask pf[
-    output-print      ("****************************************************************************************************")
-    output-print ( word "************************************DATI FINALI IMPIANTO DELL'AGENTE " id "***************************")
+    
     let last_ricavi_incentivi last ricavi_incentivi
     let last_ricavi_autoconsumo last ricavi_autoconsumo
     let last_ricavi_vendita last ricavi_vendita
-    ;; output-print ( word " ricavi_incentivi          " ricavi_incentivi )
-    ;; output-print ( word " ricavi_autoconsumo        " ricavi_autoconsumo )
-    ;; output-print ( word  " ricavi_vendita            " ricavi_vendita )
-    ;; output-print (word   " flusso_cassa              " flusso_cassa )
+    let costi_annuali precision ((costo_impianto * Manutenzione_anno_%costo_totale)  / 100 ) 2
     
-    output-print (word   " kw_immessi              " kw_immessi )
-    output-print (word   " stima_kw_immessi              " stima_kw_immessi )
-    output-print (word   " kw_prelevati              " kw_prelevati )
-    output-print (word   " stima_kw_prelevati              " stima_kw_prelevati )
-    output-print (word   " kw_autoconsumo              " kw_autoconsumo )
-    output-print (word   " stima_kw_autoconsumo              " stima_kw_autoconsumo )
-    output-print (word   " consumo_medio_annuale              " consumo_medio_annuale )
-    output-print (word   " stima_consumo_medio_annuale              " stima_consumo_medio_annuale )
-    output-print (word   " kw_annui_impianto              " kw_annui_impianto )
-    output-print (word   " stima_kw_annui_impianto              " stima_kw_annui_impianto )
+    ;; condizione per debug
+    ;; if ( id <= 60 and roe% < roe_stimato)
     
-    output-print (word   " ricavi_incentivi              " last_ricavi_incentivi )
-    output-print (word   " stima_ric_incentivo              " stima_ric_incentivo )
+    output-print      ("****************************************************************************************************")
+    output-print ( word "************************************DATI FINALI IMPIANTO DELL'AGENTE " id "***************************")
     
-    output-print (word   " ricavi_autoconsumo              " last_ricavi_autoconsumo )
-    output-print (word   " stima_ric_autoconsumo              " stima_ric_autoconsumo )
+    ;; ;; output-print ( word " ricavi_incentivi          " ricavi_incentivi )
+    ;; ;; output-print ( word " ricavi_autoconsumo        " ricavi_autoconsumo )
+    ;; ;; output-print ( word  " ricavi_vendita            " ricavi_vendita )
+    ;; ;; output-print (word   " flusso_cassa              " flusso_cassa )
     
-    output-print (word   " ricavi_vendita              " last_ricavi_vendita )
-    output-print (word   " stima_ric_vendita              " stima_ric_vendita )
+    ;; output-print (word   " kw_immessi              " kw_immessi )
+    ;; output-print (word   " stima_kw_immessi              " stima_kw_immessi )
+    ;; output-print (word   " kw_prelevati              " kw_prelevati )
+    ;; output-print (word   " stima_kw_prelevati              " stima_kw_prelevati )
+    ;; output-print (word   " kw_autoconsumo              " kw_autoconsumo )
+    ;; output-print (word   " stima_kw_autoconsumo              " stima_kw_autoconsumo )
+    ;; output-print (word   " consumo_medio_annuale              " consumo_medio_annuale )
+    ;; output-print (word   " stima_consumo_medio_annuale              " stima_consumo_medio_annuale )
+    ;; output-print (word   " kw_annui_impianto              " kw_annui_impianto )
+    ;; output-print (word   " stima_kw_annui_impianto              " stima_kw_annui_impianto )
+    
+    ;; output-print (word   " ricavi_incentivi              " last_ricavi_incentivi )
+    ;; output-print (word   " stima_ric_incentivo              " stima_ric_incentivo )
+    
+    ;; output-print (word   " ricavi_autoconsumo              " last_ricavi_autoconsumo )
+    ;; output-print (word   " stima_ric_autoconsumo              " stima_ric_autoconsumo )
+    
+    ;; output-print (word   " ricavi_vendita              " last_ricavi_vendita )
+    ;; output-print (word   " stima_ric_vendita              " stima_ric_vendita )
+    
+    ;; output-print (word   " costi_annuali              " costi_annuali )
     
     output-print (word   " flusso_cassa_cumulato              " flusso_cassa_cumulato )
     output-print (word   " stima_flusso_cassa_cumulato              " stima_flusso_cassa_cumulato )
@@ -1851,14 +1918,19 @@ to stampa_agenti
     output-print (word   " flusso_cassa_attualizzato_cumulato              " flusso_cassa_attualizzato_cumulato )
     output-print (word   " stima_flusso_cassa_attualizzato_cumulato              " stima_flusso_cassa_attualizzato_cumulato )
     
+    output-print (word   " ifin                       " ifin )
+    
     let last_van last van
     ;;output-print (word   " van                       " van )
-    output-print (word   " van                       " last_van )
-    output-print (word   " stima_van                       " stima_van )
+    ;; output-print (word   " van                       " last_van )
+    ;; output-print (word   " stima_van                       " stima_van )
     
     output-print (word   " ROE                       " roe% )
     output-print (word   " ROE stimato                      " roe_stimato )
+    
+    ;; output-print (word   " Finanziamento regionale                       " freg)
     ;; output-print      ("****************************************************************************************************")
+    
   ] 
 end
 
@@ -2821,7 +2893,7 @@ CHOOSER
 fr
 fr
 "Nessuno" "Asta" "Conto interessi" "Rotazione" "Garanzia"
-0
+1
 
 SLIDER
 17

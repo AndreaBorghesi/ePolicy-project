@@ -6,6 +6,7 @@ globals [ wacc m2Kwp  count_tick scala_dim_impianto time anno number durata_impi
   INCENTIVO_PRO2012 INCENTIVO_PRO2013 INCENTIVO_PRO2014 INCENTIVO_PRO2015 INCENTIVO_PRO2016 INCENTIVO_PROTOT 
   Budget2012 Budget2013 Budget2014 Budget2015 Budget2016 Budget2017;per tenere traccia del budget annuale, spese più ricavi
   TOT_SPESA2012 TOT_SPESA2013 TOT_SPESA2014 TOT_SPESA2015 TOT_SPESA2016 TOT_SPESA 
+  
   r2012 r2013 r2014 r2015 r2016 ;percentuale agenti che non sono morti
   BudgetCorrente;quanto è rimasto del budget iniziale
   totreg;quanti hanno usufruito degli incentivi regionali   
@@ -17,8 +18,10 @@ globals [ wacc m2Kwp  count_tick scala_dim_impianto time anno number durata_impi
   totneg2012 totneg2013 totneg2014 totneg2015 totneg2016
   percnegativa;percentuale di quante hanno rifutato l'investimento
   percpositive;di quanti hanno investito
+  
   ;; estensioni per inserire nel modello i vari conti energia
   kw_installed_yearly ;; tengo traccia dei kw installati ogni anno
+  
 ]
 
 ;; DEFINIZIONE AGENTI E ATTRIBUTI AGENTI
@@ -29,7 +32,8 @@ pf-own [id consumo_medio_annuale budget %cop_cosumi M2disposizione dimensione_im
   anno_realizzazione semestre_realizzazione vita_impianto Data_termine_incentivi tariffa_incentivante tariffa_autoconsumo tariffa_omnicomprensiva 
   ricavi_autoconsumo ricavi_vendita ricavi_incentivi costi_energia_prelevata  costi_tot_energia_prelevata 
   flusso_cassa flusso_cassa_attualizzato flusso_cassa_cumulato  flusso_cassa_attualizzato_cumulato
-  van PBT roi% roe% incentivo_installazione 
+  van PBT roi% roe% incentivo_installazione
+   
   freg;finanziamento regionale, se si fa finanziare o no dalle regione
   pfin;ercentuale finanziamento
   ifin;incentivo finanziamtno(quanto risparmio, solo con modalità asta)
@@ -45,6 +49,7 @@ pf-own [id consumo_medio_annuale budget %cop_cosumi M2disposizione dimensione_im
   initosti;ostinaz iniziale
   valutaincentivi
   mortoxm2
+  
   ;; parametri per stimare il ROE per decidere se effettuare l'investimento
   stima_flusso_cassa_cumulato  ;; stima della somma dei flussi di cassa 
   stima_flusso_cassa_attualizzato_cumulato  ;; stima della somma dei flussi di cassa, valore attualizzato
@@ -59,6 +64,9 @@ pf-own [id consumo_medio_annuale budget %cop_cosumi M2disposizione dimensione_im
   stima_kw_autoconsumo
   stima_consumo_medio_annuale
   stima_kw_annui_impianto
+  ;; estensioni per inserire nel modello i vari conti energia
+  conto_energia ;; il conto energia nel quale rientra ogni agente pf (primo--> non implementato, secondo-->2, terzo-->3, quarto-->4, quinto-->5)
+  prezzi_minimi_gse
 ]
  
 breed [ar] ;; ar-> agente unico che rappresenta la regione
@@ -1112,6 +1120,311 @@ to calcola_rapporto
   set percpositive 100 - percnegativa
 end
 
+
+;; procedura per decidere a quale Conto Energia deve fare riferimento un agente
+;; vedere ScelteProg.txt per una breve discussione a tal proposito
+to set_conto_energia
+  ;; la scelta viene fatta in base all'anno ed al semestre di realizzazione
+  set anno_realizzazione anno
+  set semestre_realizzazione time 
+  ;; ricordare che, per convenzione: primo--> non implementato, secondo-->2, terzo-->3, quarto-->4, quinto-->5
+  ifelse (anno_realizzazione = 2007 or anno_realizzazione = 2008 or anno_realizzazione = 2009 or anno_realizzazione = 2010)
+  [;; periodo 2007-2010, secondo CE
+    set conto_energia 2
+  ];; fine periodo 2007-2010
+  [;; else periodo 2011-2013
+    ;; primo semestre 2011: Secondo e Terzo CE contemporaneamente
+    ifelse(anno_realizzazione = 2011 and semestre_realizzazione = 1)
+    [;; primo semestre 2011
+      ;; dai dati storici, si osserva che nel primo semestre 2011 sono stati installati circa 54k impianti nel Secondo CE contro i 38k del Terzo -->
+      ;; --> cerchiamo di riflettere questa distribuzione assegnando una probabilità maggiore al Secondo CE
+      let rndm random 100
+      ifelse(rndm < 60) ;; con prob. circa pari a 60% Secondo CE
+      [
+        set conto_energia 2
+      ]
+      [ ;; con prob. circa pari a 40% Terzo CE
+        set conto_energia 3
+      ]
+    ];; fine primo semestre 2011
+    [;; else secondo semestre 2011 - 2013
+      ifelse(anno_realizzazione = 2011 and semestre_realizzazione = 2)
+      [;; secondo semestre 2011
+        set conto_energia 4
+      ];; fine secondo semestre 2011
+      [;; periodo 2012-2013
+        ifelse(anno_realizzazione = 2012 and semestre_realizzazione = 1)
+        [;; primo semestre 2012
+          set conto_energia 4
+        ];; fine primo semestre 2012
+        [;; else secondo semestre 2012 - 2013
+          set conto_energia 5 ;; in realtà non dovrei applicare il Quinto CE anche agli impianti del secondo semestre 2013
+        ];; else secondo semestre 2012 - 2013
+      ];; fine periodo 2012-2013
+    ];; fine else secondo semestre 2011 - 2013
+  ];; fine else periodo 2011-2013
+end
+
+
+;; PROCEDURA PER LA LETTURA DEI PREZZI MINIMI EFFETIVAMENTE APPLICATI DAL GSE NEL 2008-2012 (dati prelevati da file in cartella di lancio)
+to calcola_prezzi_minimi_gse
+  set prezzi_minimi_gse []
+  ifelse (anno_realizzazione = 2007 and file-exists? "PrezziMinimi2008.txt" ) ;; in realtà nel 2007 non è ancora previsto il ritiro dedicato --> modello semplificato
+  [
+    file-open "PrezziMinimi2007.txt"
+               while [ not file-at-end? ]
+               [
+                 let letto file-read
+                 set prezzi_minimi_gse lput letto prezzi_minimi_gse
+               ]
+               file-close
+  ]
+  [;; else non 2007
+    ifelse (anno_realizzazione = 2008 and file-exists? "PrezziMinimi2008.txt" )
+    [
+      file-open "PrezziMinimi2008.txt"
+               while [ not file-at-end? ]
+               [
+                 let letto file-read
+                 set prezzi_minimi_gse lput letto prezzi_minimi_gse
+               ]
+               file-close
+    ]
+    [;; else non 2008
+      ifelse (anno_realizzazione = 2009 and file-exists? "PrezziMinimi2009.txt" )
+      [
+        file-open "PrezziMinimi2009.txt"
+               while [ not file-at-end? ]
+               [
+                 let letto file-read
+                 set prezzi_minimi_gse lput letto prezzi_minimi_gse
+               ]
+               file-close
+      ]
+      [;; else non 2009
+        ifelse (anno_realizzazione = 2010 and file-exists? "PrezziMinimi2010.txt" )
+        [
+          file-open "PrezziMinimi2010.txt"
+               while [ not file-at-end? ]
+               [
+                 let letto file-read
+                 set prezzi_minimi_gse lput letto prezzi_minimi_gse
+               ]
+               file-close
+        ]
+        [;; else non 2010
+          ifelse (anno_realizzazione = 2011 and file-exists? "PrezziMinimi2011.txt" )
+          [
+            file-open "PrezziMinimi2011.txt"
+               while [ not file-at-end? ]
+               [
+                 let letto file-read
+                 set prezzi_minimi_gse lput letto prezzi_minimi_gse
+               ]
+               file-close
+          ]
+          [;; else non 2011
+            if(semestre_realizzazione = 1 and file-exists? "PrezziMinimi2012.txt" ) ;; nel 2012 i prezzi minimi hanno senso solo nel primo semestre, quando è in vigore ancora il Quarto CE
+            [
+               file-open "PrezziMinimi2012.txt"
+               while [ not file-at-end? ]
+               [
+                 let letto file-read
+                 set prezzi_minimi_gse lput letto prezzi_minimi_gse
+               ]
+               file-close
+            ]
+          ];; fine else non 2011
+        ];; fine else non 2010
+      ];; fine else non 2009
+    ];; fine else non 2008
+  ];; fine else non 2007
+end
+
+;; procedura per la lettura delle tariffe incentivanti con i diversi Conti Energia
+;;2007-2010 2 CE, 2011 2 CE, 2011 3 CE, 2011-2012 4 CE --> tariffa incentivante
+;;2012-2013 5 CE --> tariffa onnicomprensiva e incentivante
+to calcola_tariffe_ce
+  ifelse( ( anno_realizzazione = 2007 or anno_realizzazione = 2008 ) and file-exists? "SecondoCE_inc2007-08.txt" ) 
+  [;; 2007-2008
+    set tariffa_autoconsumo "Non prevista"
+    set  tariffa_omnicomprensiva "Non prevista"
+    let count_t 0
+    file-open "SecondoCE_inc2007-08.txt"
+    while [ not file-at-end? ] 
+    [ ;; legge da file finché non trova la tariffa relativa alla fascia di potenza corretta
+      let letto file-read
+      set count_t count_t + 1
+      if (count_t = fascia_potenza )
+      [
+        set  tariffa_incentivante  letto
+      ]          
+    ]
+    file-close
+  ];; fine 2007-2008
+  [;; else 2009-2013
+    ifelse( anno_realizzazione = 2009 and file-exists? "SecondoCE_inc2009.txt" )
+    [;; 2009
+      set tariffa_autoconsumo "Non prevista"
+      set  tariffa_omnicomprensiva "Non prevista"
+      let count_t 0
+      file-open "SecondoCE_inc2009.txt"
+      while [ not file-at-end? ]
+      [ ;; legge da file finché non trova la tariffa relativa alla fascia di potenza corretta
+        let letto file-read
+        set count_t count_t + 1
+        if (count_t = fascia_potenza )
+        [
+          set  tariffa_incentivante  letto
+        ]       
+      ]
+      file-close
+    ];; fine 2009
+    [;; 2010-2013
+      ifelse( anno_realizzazione = 2010 or ( anno_realizzazione = 2011 and semestre_realizzazione = 1) )
+      [;; 2010 e 1 semestre 2011
+        ;; nel primo semestre del 2011 coesistono agenti con il Secondo ed il Terzo CE
+        ifelse( conto_energia = 2 and file-exists? "SecondoCE_inc2010-11.txt")
+        [;; secondo conto energia
+           set tariffa_autoconsumo "Non prevista"
+           set  tariffa_omnicomprensiva "Non prevista"
+           let count_t 0
+           file-open "SecondoCE_inc2010-11.txt"
+           while [ not file-at-end? ]
+           [ ;; legge da file finché non trova la tariffa relativa alla fascia di potenza corretta
+             let letto file-read
+             set count_t count_t + 1
+             if (count_t = fascia_potenza )
+             [
+               set  tariffa_incentivante  letto
+             ]             
+           ]
+           file-close
+        ];; fine secondo conto energia
+        [;; terzo conto energia
+          if(file-exists? "TerzoCE_inc2011.txt")
+          [
+             set tariffa_autoconsumo "Non prevista"
+             set  tariffa_omnicomprensiva "Non prevista"
+             let count_t 0
+             file-open "TerzoCE_inc2011.txt"
+             while [ not file-at-end? ]
+             [ ;; legge da file finché non trova la tariffa relativa alla fascia di potenza corretta
+                  let letto file-read
+                  set count_t count_t + 1
+                  if (count_t = fascia_potenza )
+                  [
+                    set  tariffa_incentivante  letto
+                  ]        
+             ]
+             file-close
+          ]
+        ];; fine terzo conto energia
+      ];; fine 2010 e 1 semestre 2011
+      [;; secondo semestre 2011 e 2012-2013
+        ifelse( ( anno_realizzazione = 2011 and semestre_realizzazione = 2) and file-exists? "QuartoCE_inc2011.txt" )
+        [;; secondo semestre 2011
+          set tariffa_autoconsumo "Non prevista"
+          set  tariffa_omnicomprensiva "Non prevista"
+          let count_t 0
+          file-open "QuartoCE_inc2011.txt"
+          while [ not file-at-end? ]
+          [ ;; legge da file finché non trova la tariffa relativa alla fascia di potenza corretta
+             let letto file-read
+             set count_t count_t + 1
+             if (count_t = fascia_potenza )
+             [
+               set  tariffa_incentivante  letto
+             ]       
+          ]
+          file-close
+        ];; fine secondo semestre 2011
+        [;; 2012-2013
+          ifelse( ( anno_realizzazione = 2012 and semestre_realizzazione = 1) and file-exists? "QuartoCE_inc2012.txt" )
+          [;; primo semestre 2012
+            set tariffa_autoconsumo "Non prevista"
+            set  tariffa_omnicomprensiva "Non prevista"
+            let count_t 0
+            file-open "QuartoCE_inc2012.txt"
+            while [ not file-at-end? ]
+            [ ;; legge da file finché non trova la tariffa relativa alla fascia di potenza corretta
+              let letto file-read
+              set count_t count_t + 1
+              if (count_t = fascia_potenza )
+              [
+                set  tariffa_incentivante  letto
+              ]       
+            ]
+            file-close
+          ];; fine primo semestre 2012
+          [;; secondo semestre 2012 e 2013
+            ifelse( ( anno_realizzazione = 2012 and semestre_realizzazione = 2) and file-exists? "QuintoCE_onni2012.txt" and file-exists? "QuintoCE_auto2012.txt" )
+            [ ;; secondo semestre 2012
+              set  tariffa_incentivante "Non prevista"
+              let count_t 0
+              file-open "QuintoCE_auto2012.txt"
+              while [ not file-at-end? ]
+              [ ;; legge da file finché non trova la tariffa relativa alla fascia di potenza corretta
+                 let letto file-read
+                 set count_t count_t + 1
+                 if (count_t = fascia_potenza )
+                 [
+                   set  tariffa_autoconsumo  letto
+                 ]       
+              ]
+              file-close
+              set count_t 0
+              file-open "QuintoCE_onni2012.txt"
+              while [ not file-at-end? ]
+              [ ;; legge da file finché non trova la tariffa relativa alla fascia di potenza corretta
+                 let letto file-read
+                 set count_t count_t + 1
+                 if (count_t = fascia_potenza )
+                 [
+                   set  tariffa_omnicomprensiva  letto
+                 ]         
+              ]
+              file-close
+            ];; fine  secondo semestre 2012
+            [ ;; 2013
+               if( anno_realizzazione = 2013 and file-exists? "QuintoCE_onni2013.txt" and file-exists? "QuintoCE_auto2013.txt" )
+               [
+                 set  tariffa_incentivante "Non prevista"
+                 let count_t 0
+                 file-open "QuintoCE_auto2013.txt"
+                 while [ not file-at-end? ]
+                 [ ;; legge da file finché non trova la tariffa relativa alla fascia di potenza corretta
+                   let letto file-read
+                   set count_t count_t + 1
+                   if (count_t = fascia_potenza )
+                   [
+                     set  tariffa_autoconsumo  letto
+                   ]       
+                 ]
+                 file-close
+                 set count_t 0
+                 file-open "QuintoCE_onni2013.txt"
+                 while [ not file-at-end? ]
+                 [ ;; legge da file finché non trova la tariffa relativa alla fascia di potenza corretta
+                   let letto file-read
+                   set count_t count_t + 1
+                   if (count_t = fascia_potenza )
+                   [
+                     set  tariffa_omnicomprensiva  letto
+                   ]     
+                 ]
+                 file-close
+               ]
+            ] ;; fine 2013
+          ];; fine secondo semestre 2012 e 2013
+        ];; fine 2012-2013
+      ];; fine secondo semestre 2011 e 2012-2013
+    ];; fine 2010-2013
+  ];; fine else 2009-2013
+end
+
+
+;; >>>>>>>>>>>>>>>> VECCHIA VERSIONE: qui non sono presi in considerazione i Conti Energia <<<<<<<<<<<<<<<<<<<<<<<<<
 ;; PROCEDURA PER LA LETTURA DELLA TARIFFA RICONOSCIUTA (dati prelevati da file in cartella di lancio)
 ;se 2012-> tariffa incentivante
 ;se >2012 tariffa autoconsumo e omnicomprensiva
@@ -1394,6 +1707,7 @@ to calcola_flusso_di_cassa
   set van lput van_ora van
 end
 
+;; >>>>>>>>>>>>>>>> VECCHIA VERSIONE: qui non sono presi in considerazione i Conti Energia e sfrutta i prezzi minimi del gse nel 2011<<<<<<<<<<<<<<<<<<<<<<<<<
 ;; PROCEDURA DI INDIVIDUAZIONE DEI RICAVI PER GLI IMPIANTI INSTALLATI DOPO IL 2012
 to calcola_ricavi_impianti_2012
   let ricavo_incentivo precision ( kw_annui_impianto *  tariffa_incentivante ) 2
@@ -1421,8 +1735,18 @@ to calcola_ricavi_impianti_2012
   ;; I GRANDI IMPIANTI DEVONO SE NON EFFETTUARE UNA TIPOLOGIA DI RIVENDITA DI TIPO DIRETTO V.TESI
 end
 
-;; PROCEDURA INDIVIDUAZIONE RICAVI IMPIANTI INSTALLATI A PARTIRE DAL 2013
-to calcola_ricavi_impianti_non2012
+
+;; procedura per il calcolo dei ricavi degli impianti con Secondo, Terzo e Quarto CE
+;; per ora il modello simulato prevede il Ritiro Dedicato per tutti i Conti Energia e classi di potenza/impianti
+to calcola_ricavi_impianti_CE_2_3_4
+  
+  
+  ;; vedi procedura calcola_ricavi_impianti_2012 --> per gli impianti di classe 6 non si applica il Ritiro Dedicato ma dovrebbero essere implementati meccanismi diretti
+end
+
+;; >>>>>>>>>>>>>>>> VECCHIA VERSIONE: va bene anche nel simulatore con CE, a patto di tenere conto del fatto che calcola i ricavi a partire dal secondo semestre 2012<<<<<<<<<<<<<<<<<<<<<<<
+;; procedura per il calcolo dei ricavi degli impianti con Quinto CE
+to calcola_ricavi_impianti_CE_5
   let ricavo_incentivo precision ( kw_autoconsumo * tariffa_autoconsumo ) 2
   set ricavi_incentivi lput ricavo_incentivo ricavi_incentivi
   let ricavo_vendita precision ( kw_immessi * tariffa_omnicomprensiva ) 2

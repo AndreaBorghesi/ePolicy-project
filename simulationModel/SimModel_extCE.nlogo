@@ -21,7 +21,17 @@ globals [ wacc m2Kwp  count_tick scala_dim_impianto time anno number durata_impi
   
   ;; estensioni per inserire nel modello i vari conti energia
   kw_installed_yearly ;; tengo traccia dei kw installati ogni anno
-  
+  count_pf2007 count_pf2008 count_pf2009 count_pf2010 count_pf2011 
+  kW2007 kW2008 kW2009 kW2010 kW2011    
+  INCENTIVO_INST2007 INCENTIVO_INST2008 INCENTIVO_INST2009 INCENTIVO_INST2010 INCENTIVO_INST2011 
+  INCENTIVO_PRO2007 INCENTIVO_PRO2008 INCENTIVO_PRO2009 INCENTIVO_PRO2010 INCENTIVO_PRO2011 
+  Budget2008 Budget2007 Budget2009 Budget2010 Budget2011 
+  TOT_SPESA2007 TOT_SPESA2008 TOT_SPESA2009 TOT_SPESA2010 TOT_SPESA2011
+  percneg2007 percneg2008 percneg2009 percneg2010 percneg2011
+  totneg2007 totneg2008 totneg2009 totneg2010 totneg2011
+  r2007 r2008 r2009 r2010 r2011
+  ;; ogni agente può accedere a prezzi minimi diversi in base all'anno di entrata in esercizio --> lista di 3 elementi, per le diverse quantità di energia immessa
+  prezzi_minimi_gse ;; 
 ]
 
 ;; DEFINIZIONE AGENTI E ATTRIBUTI AGENTI
@@ -66,7 +76,7 @@ pf-own [id consumo_medio_annuale budget %cop_cosumi M2disposizione dimensione_im
   stima_kw_annui_impianto
   ;; estensioni per inserire nel modello i vari conti energia
   conto_energia ;; il conto energia nel quale rientra ogni agente pf (primo--> non implementato, secondo-->2, terzo-->3, quarto-->4, quinto-->5)
-  prezzi_minimi_gse
+  
 ]
  
 breed [ar] ;; ar-> agente unico che rappresenta la regione
@@ -79,14 +89,17 @@ ar-own [
 to setup
   __clear-all-and-reset-ticks
   
+  ;; questi costi sono ancora quelli del simulatore originale, relativi al 2011 
   set costo_kwh_fascia1 0.278
   set costo_kwh_fascia2 0.162
   set costo_kwh_fascia3 0.194
   set costo_kwh_fascia4 0.246
   set costo_kwh_fascia5 0.276
+  set prezzi_minimi_gse []
   output-print (word "---------------------------------------------------------------------------------")
   output-print (word "-----------------------------------INIZIO SIMULAZIONE----------------------------")
   set_global
+  calcola_prezzi_minimi_gse
   output-print (word "NUMERO AGENTI PER SEMESTRE: "NAgentiFINAL)
   output-print (word "PREVISTA VARIAZIONE TARIFFE INCENTIVANTI SULLA PRODUZIONE: " Varia_Tariffe_Incetivanti )
   output-print (word "PREVISTI INCENTIVI INSTALLAZIONE: " Incentivi_Installazione )
@@ -132,7 +145,7 @@ to go
   aggiorna_budget
   
   ;; LA SIMULAZIONE SI INTERROMPE PER PERMETTERE ALL'UTENTE DI SETTARE EVENTUALI STRUMENTI INCENTIVANTI 
-  if (anno <= 2016 );creo altri agenti
+  if (anno <= 2013 );creo altri agenti
   [
     if (Incentivi_Dinamici)
     [
@@ -154,12 +167,12 @@ to go
   ]
   aggiorna_kw_annui
   
-  if (anno = 2017);ora non creo più nulla faccio solo evolvere
+  if (anno = 2014);ora non creo più nulla faccio solo evolvere
   [
     calcola_rapporto
     set percreg precision ((totreg / count_pf) * 100) 2
   ]
-  if (anno = 2016 + durata_impianti + 1   and time = 2 );fine simulazione
+  if (anno = 2013 + durata_impianti + 1   and time = 2 );fine simulazione
   [ 
     ;; update_plot_roe
     aggiorna_incentivi_prod
@@ -183,6 +196,7 @@ to go
     set time 0
     set anno anno + 1
     aggiorna_prezzi;tutto cambia di anno in anno
+    calcola_prezzi_minimi_gse
   ]
 end
 
@@ -214,30 +228,55 @@ to default
   set kW2014 0
   set kW2015 0
   set kW2016 0
+  set kW2007 0
+  set kW2008 0
+  set kW2009 0
+  set kW2010 0
+  set kW2011 0
   set kWTOT 0
   set INCENTIVO_INST2012 0
   set INCENTIVO_INST2013 0
   set INCENTIVO_INST2014 0
   set INCENTIVO_INST2015 0
   set INCENTIVO_INST2016 0 
+  set INCENTIVO_INST2007 0
+  set INCENTIVO_INST2008 0
+  set INCENTIVO_INST2009 0
+  set INCENTIVO_INST2010 0
+  set INCENTIVO_INST2011 0 
   set INCENTIVO_INSTOT 0
   set INCENTIVO_PRO2012 0
   set INCENTIVO_PRO2013 0 
   set INCENTIVO_PRO2014  0 
   set INCENTIVO_PRO2015 0
-  set INCENTIVO_PRO2016 0 
+  set INCENTIVO_PRO2016 0
+  set INCENTIVO_PRO2007 0
+  set INCENTIVO_PRO2008 0 
+  set INCENTIVO_PRO2009  0 
+  set INCENTIVO_PRO2010 0
+  set INCENTIVO_PRO2011 0  
   set INCENTIVO_PROTOT 0
   set TOT_SPESA2012 0
   set TOT_SPESA2013 0
   set TOT_SPESA2014 0 
   set TOT_SPESA2015 0 
   set TOT_SPESA2016 0 
+  set TOT_SPESA2007 0
+  set TOT_SPESA2008 0
+  set TOT_SPESA2009 0 
+  set TOT_SPESA2010 0 
+  set TOT_SPESA2011 0
   set TOT_SPESA 0
   set Budget2012 0
   set Budget2013 0
   set Budget2014 0
   set Budget2015 0
   set Budget2016 0
+  set Budget2007 0
+  set Budget2008 0
+  set Budget2009 0
+  set Budget2010 0
+  set Budget2011 0
   set Budget2017 0
   set Incentivi_Installazione false
   set %_Incentivi_Installazione 10
@@ -248,11 +287,21 @@ to default
   set count_pf2014 0
   set  count_pf2015 0
   set count_pf2016 0
+  set count_pf2011 0
+  set  count_pf2007 0
+  set count_pf2008 0
+  set  count_pf2009 0
+  set count_pf2010 0
   set r2012 0
   set r2013 0
   set r2014 0
   set r2015 0
   set r2016 0
+  set r2007 0
+  set r2008 0
+  set r2009 0
+  set r2010 0
+  set r2011 0
   set LeggiSerieStoriche true
   set fr "Nessuno"
   clear-output
@@ -266,13 +315,18 @@ to set_global
   set totneg2014 0
   set totneg2015 0
   set totneg2016 0
+  set totneg2007 0
+  set totneg2008 0
+  set totneg2009 0
+  set totneg2010 0
+  set totneg2011 0
   set totnegsoldi 0
   set totdied 0
   set totreg 0
   set durata_impianti 20
   set count_tick 0
-  set time 1;si parte dal primo semestre 2012
-  set anno 2012
+  set time 1;si parte dal primo semestre 2007
+  set anno 2007
   set count_pf 0;non ho ancroa creato nuessuno
   set WACC Tasso_lordo_rendimento_BOT 
   set scala_dim_impianto 0.5
@@ -353,7 +407,7 @@ to create_pf
         
         ;; stima del roe
         set roe_stimato 0 ; per inizializzarlo
-        stima_roe
+        ;; stima_roe
         ;; output-print  (word   "------------>>> AGENTE " id  "  Roe stimato per l'investimento: " roe_stimato) 
         ;; output-print  (word   "----DEBUG------------>>> AGENTE " id  "  stima_flusso_cassa_cumulato: " stima_flusso_cassa_cumulato) 
         ;; output-print  (word   "----DEBUG------------>>> AGENTE " id  "  costo_impianto: " costo_impianto) 
@@ -433,6 +487,7 @@ to genera_pf
         
       ]
     ]
+  set_conto_energia
   calcola_dimensione;dopo ho dimensione impianto i m2
   calcola_costi_impianto;dopo ho costo impianto in euro
   ;gestione incentivi regionali                          
@@ -559,7 +614,9 @@ to valuta_fattibilita_impianto
       set color green
       aumenta_impianto;guardo se riesco ad aumentare la dim dell'mipianto
       calcola_fascia_potenza
-      calcola_tariffa_gse
+      ;; calcola_tariffa_gse  ;;Vecchia versione senza CE
+      ;; calcola_prezzi_minimi_gse
+      calcola_tariffe_ce
       aggiorna_kW
       aggiorna_incentivi_installazione
       aggiorna_budget_annuale
@@ -583,37 +640,19 @@ to valuta_fattibilita_impianto
               set  totnegsoldi totnegsoldi + 1
               ;show "realizzazione impianto impossibile : Eccedenza dimensionamento e costi"
               ;show word costo_impianto word "   " word (costo_impianto - ifin + intRegione) word "    "  word budget word "  " morto
-              ifelse anno = 2012
-              [
-                set totneg2012 totneg2012 + 1
-              ]
-              [
-                ifelse anno = 2013
-                [
-                  set totneg2013 totneg2013 + 1
-                ]
-                [
-                  ifelse anno = 2014
-                  [
-                    set totneg2014 totneg2014 + 1
-                  ]
-                  [
-                    ifelse anno = 2015
-                    [
-                      set totneg2015 totneg2015 + 1
-                    ]
-                    [
-                      ifelse anno = 2016
-                      [
-                        set totneg2016 totneg2016 + 1
-                      ]
-                      [
-                        
-                      ]
-                    ]
-                  ]
-                ]
-              ] 
+              ifelse anno = 2007 [ set totneg2007 totneg2007 + 1 ][
+              ifelse anno = 2008 [ set totneg2008 totneg2008 + 1 ][
+              ifelse anno = 2009 [ set totneg2009 totneg2009 + 1 ][
+              ifelse anno = 2010 [ set totneg2010 totneg2010 + 1 ][
+              ifelse anno = 2011 [ set totneg2011 totneg2011 + 1 ][
+              ifelse anno = 2012 [ set totneg2012 totneg2012 + 1 ][
+              ifelse anno = 2013 [ set totneg2013 totneg2013 + 1 ][
+              ifelse anno = 2014 [ set totneg2014 totneg2014 + 1 ][
+              ifelse anno = 2015 [ set totneg2015 totneg2015 + 1 ][
+              ifelse anno = 2016 [ set totneg2016 totneg2016 + 1 ][
+               ;; default case 
+              ]]]]]]]]]]
+                  
             ]   
           ]  
           [
@@ -672,7 +711,7 @@ end
 ;; VALUTAZIONE AUMENTO DIMENSIONI E POTENZA IMPIANTO IN BASE A OSTINAZIONE
 to aumenta_impianto
   let dim_imp dimensione_impianto
-  if ( %ostinazione + influenza * sensibilita > 50);se non sono ostinato nemeno cerco di aumentare le dimensioni
+  if ( %ostinazione + influenza * sensibilita > 50);se non sono ostinato nemmeno cerco di aumentare le dimensioni
   [
     set dimensione_impianto M2disposizione
     set kw_annui_impianto (round ( dimensione_impianto / m2Kwp )) * Irradiazione_media_annua_kwh_kwp
@@ -698,7 +737,8 @@ to accetta_ridimensionamento
       set kw_annui_impianto (round ( dimensione_impianto / m2Kwp )) * Irradiazione_media_annua_kwh_kwp
       calcola_costi_impianto
       calcola_fascia_potenza
-      calcola_tariffa_gse
+      calcola_tariffe_ce
+      ;; calcola_tariffa_gse vecchia versione senza CE
       aggiorna_kW
       aggiorna_incentivi_installazione
       aggiorna_budget_annuale
@@ -732,7 +772,8 @@ to accetta_prestito
       calcola_interessi
       calcola_costi_impianto
       calcola_fascia_potenza
-      calcola_tariffa_gse
+      ;; calcola_tariffa_gse versione senza CE
+      calcola_tariffe_ce
       aggiorna_kW
       aggiorna_incentivi_installazione
       aggiorna_budget_annuale
@@ -749,37 +790,19 @@ to accetta_prestito
         set count_pf count_pf - 1
         ;show "realizzazione impianto impossibile : Prestito non accettato**************"
         set  totnegsoldi totnegsoldi + 1
-        ifelse anno = 2012
-        [
-          set totneg2012 totneg2012 + 1
-        ]
-        [
-          ifelse anno = 2013
-            [
-              set totneg2013 totneg2013 + 1
-            ]
-            [
-              ifelse anno = 2014
-              [
-                set totneg2014 totneg2014 + 1
-              ]
-              [
-                ifelse anno = 2015
-                [
-                  set totneg2015 totneg2015 + 1
-                ]
-                [
-                  ifelse anno = 2016
-                  [
-                    set totneg2016 totneg2016 + 1
-                  ]
-                  [
-                    
-                  ]
-                ]
-              ]
-            ]
-        ]    
+        ifelse anno = 2007 [ set totneg2007 totneg2007 + 1 ][
+        ifelse anno = 2008 [ set totneg2008 totneg2008 + 1 ][
+        ifelse anno = 2009 [ set totneg2009 totneg2009 + 1 ][
+        ifelse anno = 2010 [ set totneg2010 totneg2010 + 1 ][
+        ifelse anno = 2011 [ set totneg2011 totneg2011 + 1 ][
+        ifelse anno = 2012 [ set totneg2012 totneg2012 + 1 ][
+        ifelse anno = 2013 [ set totneg2013 totneg2013 + 1 ][
+        ifelse anno = 2014 [ set totneg2014 totneg2014 + 1 ][
+        ifelse anno = 2015 [ set totneg2015 totneg2015 + 1 ][
+        ifelse anno = 2016 [ set totneg2016 totneg2016 + 1 ][
+           ;; default case 
+        ]]]]]]]]]]
+         
       ]      
       muori
     ]
@@ -868,116 +891,69 @@ to stampa
   output-print  (word   "Potenza: " potenza_impianto " kWp")
   output-print  (word   "Fascia Potenza: " fascia_potenza)
   output-print  (word   "Tipologia Impianto: "tipologia_impianto)
-  ifelse( anno_realizzazione >= 2013)
-    [output-show ( word    "Anno impianto "  anno_realizzazione " Semestre " semestre_realizzazione " Tariffa ominocompresiva "    tariffa_omnicomprensiva " Tariffa autoconsumo " tariffa_autoconsumo )]
-    [output-show ( word   "Anno impianto "  anno_realizzazione " Semestre " semestre_realizzazione " Tariffa incentivante  " tariffa_incentivante )]  
+  output-show ( word    "Anno impianto "  anno_realizzazione " Semestre " semestre_realizzazione)
+  output-print  (word   "Conto Energia: " conto_energia)
+  output-show ( word    " Tariffa ominocompresiva "    tariffa_omnicomprensiva " Tariffa autoconsumo " tariffa_autoconsumo )
+  output-show ( word    " Tariffa incentivante  " tariffa_incentivante ) 
+  output-show ( word    " Prezzi minimi gse  " prezzi_minimi_gse ) 
   output-print  (word   "Incentivi Installazione: " incentivo_installazione "euro Ridimensionamento: " ridimensionamento " Prestito: " prestito )
   output-print     ("******************************************************************************************************")
 end
 
 ;; OBSERVER AGGIORNA LA POTENZA INSTALLATA
 to aggiorna_kW
-  ifelse (anno_realizzazione = 2012)
-  [
-    ;;aggiornamento kW installati 2012
-    set kW2012 kW2012 + potenza_impianto
-  ]
-  [
-    ifelse (anno_realizzazione = 2013)
-    [
-      ;;aggiornamento kW installati 2013
-      set kW2013 kW2013 + potenza_impianto
-    ]
-    [
-      ifelse (anno_realizzazione = 2014)
-      [
-        ;;aggiornamento kW installati 2014
-        set kW2014 kW2014 + potenza_impianto
-      ]  
-      [
-        ifelse (anno_realizzazione = 2015)
-        [
-          ;;aggiornamento kW installati 2015
-          set kW2015 kW2015 + potenza_impianto
-        ]
-        [
-          ;;aggiornamento kW installati 2016
-          set kW2016 kW2016 + potenza_impianto
-        ]
-      ]    
-    ]
-  ]
+  ;; aggiornamento potenza impianti per ogni anno
+  ifelse anno_realizzazione = 2007 [ set kW2007 kW2007 + potenza_impianto ][
+  ifelse anno_realizzazione = 2008 [ set kW2008 kW2008 + potenza_impianto ][
+  ifelse anno_realizzazione = 2009 [ set kW2009 kW2009 + potenza_impianto ][
+  ifelse anno_realizzazione = 2010 [ set kW2010 kW2010 + potenza_impianto ][
+  ifelse anno_realizzazione = 2011 [ set kW2011 kW2011 + potenza_impianto ][
+  ifelse anno_realizzazione = 2012 [ set kW2012 kW2012 + potenza_impianto ][
+  ifelse anno_realizzazione = 2013 [ set kW2013 kW2013 + potenza_impianto ][
+  ifelse anno_realizzazione = 2014 [ set kW2014 kW2014 + potenza_impianto ][
+  ifelse anno_realizzazione = 2015 [ set kW2015 kW2015 + potenza_impianto ][
+  ifelse anno_realizzazione = 2016 [ set kW2016 kW2016 + potenza_impianto ][
+       ;; default case 
+  ]]]]]]]]]]
+  
   ;; aggiornamento kWTOTALI
   set kWTOT kWTOT + potenza_impianto
 end
 
 ;; OBSERVER AGGIORNA IL COUNT DEGLI AGENTI
 to aggiorna_pf
-  ifelse (anno_realizzazione = 2012)
-  [
-    ;;aggiornamento kW installati 2012
-    set count_pf2012 count_pf2012 + 1
-  ]
-  [
-    ifelse (anno_realizzazione = 2013)
-    [
-      ;;aggiornamento kW installati 2013
-      set count_pf2013 count_pf2013 + 1
-    ]
-    [
-      ifelse (anno_realizzazione = 2014)
-      [
-        ;;aggiornamento kW installati 2014
-        set count_pf2014 count_pf2014 + 1
-      ]  
-      [
-        ifelse (anno_realizzazione = 2015)
-        [
-          ;;aggiornamento kW installati 2015
-          set count_pf2015 count_pf2015 + 1
-        ]
-        [
-          ;;aggiornamento kW installati 2016
-          set count_pf2016 count_pf2016 + 1
-        ]
-      ]    
-    ]
-  ]
+  ;;aggiornamento kW installati per ogni anno
+  ifelse anno_realizzazione = 2007 [ set count_pf2007 count_pf2007 + 1 ][
+  ifelse anno_realizzazione = 2008 [ set count_pf2008 count_pf2008 + 1 ][
+  ifelse anno_realizzazione = 2009 [ set count_pf2009 count_pf2009 + 1 ][
+  ifelse anno_realizzazione = 2010 [ set count_pf2010 count_pf2010 + 1 ][
+  ifelse anno_realizzazione = 2011 [ set count_pf2011 count_pf2011 + 1 ][
+  ifelse anno_realizzazione = 2012 [ set count_pf2012 count_pf2012 + 1 ][
+  ifelse anno_realizzazione = 2013 [ set count_pf2013 count_pf2013 + 1 ][
+  ifelse anno_realizzazione = 2014 [ set count_pf2014 count_pf2014 + 1 ][
+  ifelse anno_realizzazione = 2015 [ set count_pf2015 count_pf2015 + 1 ][
+  ifelse anno_realizzazione = 2016 [ set count_pf2016 count_pf2016 + 1 ][
+       ;; default case 
+  ]]]]]]]]]]
 end
 
 ;; OBSERVER AGGIORNA SPESA INCENTIVI INSTALLAZIONE
 to aggiorna_incentivi_installazione
   
-  ifelse (anno_realizzazione = 2012)
-  [
-    ;;aggiornamento incentivi installazione 2012
-    set INCENTIVO_INST2012 INCENTIVO_INST2012 + incentivo_installazione 
-  ]
-  [
-    ifelse (anno_realizzazione = 2013)
-    [
-      ;;aggiornamento incentivi installazione 2013
-      set INCENTIVO_INST2013 INCENTIVO_INST2013 + incentivo_installazione 
-    ]
-    [
-      ifelse (anno_realizzazione = 2014)
-      [
-        ;;aggiornamento incentivi installazione 2014
-        set INCENTIVO_INST2014 INCENTIVO_INST2014 + incentivo_installazione 
-      ]  
-      [
-        ifelse (anno_realizzazione = 2015)
-        [
-          ;;aggiornamento incentivi installazione 2015
-          set INCENTIVO_INST2015 INCENTIVO_INST2015 + incentivo_installazione 
-        ]
-        [
-          ;;aggiornamento incentivi installazione 2016
-          set INCENTIVO_INST2016 INCENTIVO_INST2016 + incentivo_installazione 
-        ]
-      ]    
-    ]
-  ]
+  ;;aggiornamento incentivi isntallazione per ogni anno
+  ifelse anno_realizzazione = 2007 [ set INCENTIVO_INST2007 INCENTIVO_INST2007 + incentivo_installazione ][
+  ifelse anno_realizzazione = 2008 [ set INCENTIVO_INST2008 INCENTIVO_INST2008 + incentivo_installazione ][
+  ifelse anno_realizzazione = 2009 [ set INCENTIVO_INST2009 INCENTIVO_INST2009 + incentivo_installazione ][
+  ifelse anno_realizzazione = 2010 [ set INCENTIVO_INST2010 INCENTIVO_INST2010 + incentivo_installazione ][
+  ifelse anno_realizzazione = 2011 [ set INCENTIVO_INST2011 INCENTIVO_INST2011 + incentivo_installazione ][
+  ifelse anno_realizzazione = 2012 [ set INCENTIVO_INST2012 INCENTIVO_INST2012 + incentivo_installazione ][
+  ifelse anno_realizzazione = 2013 [ set INCENTIVO_INST2013 INCENTIVO_INST2013 + incentivo_installazione ][
+  ifelse anno_realizzazione = 2014 [ set INCENTIVO_INST2014 INCENTIVO_INST2014 + incentivo_installazione ][
+  ifelse anno_realizzazione = 2015 [ set INCENTIVO_INST2015 INCENTIVO_INST2015 + incentivo_installazione ][
+  ifelse anno_realizzazione = 2016 [ set INCENTIVO_INST2016 INCENTIVO_INST2016 + incentivo_installazione ][
+       ;; default case 
+  ]]]]]]]]]]
+  
   ;;aggiornamento incentivi installazione TOTALI
   set INCENTIVO_INSTOT INCENTIVO_INSTOT + incentivo_installazione  
 end
@@ -985,120 +961,59 @@ end
 ;;salva budget corrente alla fine di ogni anno
 to aggiorna_budget_annuale
   
-  ifelse (anno_realizzazione = 2012)
-  [
-    set Budget2012 BudgetCorrente
-  ]
-  [
-    ifelse (anno_realizzazione = 2013)
-    [
-      set Budget2013 BudgetCorrente
-    ]
-    [
-      ifelse (anno_realizzazione = 2014)
-      [
-        set Budget2014 BudgetCorrente
-      ]  
-      [
-        ifelse (anno_realizzazione = 2015)
-        [
-          set Budget2015 BudgetCorrente
-        ]
-        [
-          set Budget2016 BudgetCorrente
-        ]
-      ]    
-    ]
-  ]
+  ifelse anno_realizzazione = 2007 [ set Budget2007 BudgetCorrente ][
+  ifelse anno_realizzazione = 2008 [ set Budget2008 BudgetCorrente ][
+  ifelse anno_realizzazione = 2009 [ set Budget2009 BudgetCorrente ][
+  ifelse anno_realizzazione = 2010 [ set Budget2010 BudgetCorrente ][
+  ifelse anno_realizzazione = 2011 [ set Budget2011 BudgetCorrente ][
+  ifelse anno_realizzazione = 2012 [ set Budget2012 BudgetCorrente ][
+  ifelse anno_realizzazione = 2013 [ set Budget2013 BudgetCorrente ][
+  ifelse anno_realizzazione = 2014 [ set Budget2014 BudgetCorrente ][
+  ifelse anno_realizzazione = 2015 [ set Budget2015 BudgetCorrente ][
+  ifelse anno_realizzazione = 2016 [ set Budget2016 BudgetCorrente ][
+       ;; default case 
+  ]]]]]]]]]]
+  
 end
 
 ;;aumenta il budget regionale all'inizio di ogni nuovo anno (della quantità specificata negli appositi slider) - è un compito riservato all'agente della regione ar
 to aggiorna_budget
   ask ar
   [
-    ;;a partire dal secondo anno: nel 2012 il budget è dato direttamente da BudgetRegione
-    ifelse (anno = 2012)
-    [
-      set BudgetCorrente BudgetCorrente
-    ]
-    [    
-      ifelse (anno = 2013)
-      [
-        set  BudgetCorrente BudgetCorrente + (BudgetRegione2013 * 1000000)
-        output-print (word ">>>>>>>>>> Aggiorno budget 2013<<<<<<<<<" )
-      ]
-      [
-        ifelse (anno = 2014)
-        [
-          set  BudgetCorrente BudgetCorrente + (BudgetRegione2014 * 1000000)
-          output-print (word ">>>>>>>>>> Aggiorno budget 2014<<<<<<<<<" )
-        ]  
-        [
-          ifelse (anno = 2015)
-          [
-            set  BudgetCorrente BudgetCorrente + (BudgetRegione2015 * 1000000)
-            output-print (word ">>>>>>>>>> Aggiorno budget 2015<<<<<<<<<" )
-          ]
-          [
-            ifelse(anno = 2016)
-            [
-              set  BudgetCorrente BudgetCorrente + (BudgetRegione2016 * 1000000)
-              output-print (word ">>>>>>>>>> Aggiorno budget 2016<<<<<<<<<" )
-            ]
-            [
-              if(anno = 2017) ;;per tenere traccia del budget effettivo rimasto alla regione dopo che tutti gli impianti sono stati realizzati
-              [
-                set Budget2017 BudgetCorrente
-              ] 
-            ]
-          ]
-        ]    
-      ]
-    ]
+    ;;a partire dal secondo anno: nel 2007 il budget è dato direttamente da BudgetRegione
+    ifelse anno = 2007 [ set BudgetCorrente BudgetCorrente ][
+    ifelse anno = 2008 [ set  BudgetCorrente BudgetCorrente + (BudgetRegione2008 * 1000000) output-print (word ">>>>>>>>>> Aggiorno budget 2008 <<<<<<<<<" ) ][
+    ifelse anno = 2009 [ set  BudgetCorrente BudgetCorrente + (BudgetRegione2009 * 1000000) output-print (word ">>>>>>>>>> Aggiorno budget 2009 <<<<<<<<<" ) ][
+    ifelse anno = 2010 [ set  BudgetCorrente BudgetCorrente + (BudgetRegione2010 * 1000000) output-print (word ">>>>>>>>>> Aggiorno budget 2010 <<<<<<<<<" ) ][
+    ifelse anno = 2011 [ set  BudgetCorrente BudgetCorrente + (BudgetRegione2011 * 1000000) output-print (word ">>>>>>>>>> Aggiorno budget 2011 <<<<<<<<<" ) ][
+    ifelse anno = 2012 [ set  BudgetCorrente BudgetCorrente + (BudgetRegione2012 * 1000000) output-print (word ">>>>>>>>>> Aggiorno budget 2012 <<<<<<<<<" ) ][
+    ifelse anno = 2013 [ set  BudgetCorrente BudgetCorrente + (BudgetRegione2013 * 1000000) output-print (word ">>>>>>>>>> Aggiorno budget 2013 <<<<<<<<<" ) ][
+    ifelse anno = 2014 [ set  BudgetCorrente BudgetCorrente + (BudgetRegione2014 * 1000000) output-print (word ">>>>>>>>>> Aggiorno budget 2014 <<<<<<<<<" ) ][
+    ifelse anno = 2015 [ set  BudgetCorrente BudgetCorrente + (BudgetRegione2015 * 1000000) output-print (word ">>>>>>>>>> Aggiorno budget 2015 <<<<<<<<<" ) ][
+    ifelse anno = 2016 [ set  BudgetCorrente BudgetCorrente + (BudgetRegione2016 * 1000000) output-print (word ">>>>>>>>>> Aggiorno budget 2016 <<<<<<<<<" ) ][
+      ;; default case 
+      set Budget2017 BudgetCorrente ;;per tenere traccia del budget effettivo rimasto alla regione dopo che tutti gli impianti sono stati realizzati
+    ]]]]]]]]]]
   ]
 end
 
 ;; aggiorna i nuovi kw installati a livello regionale ogni anno
 to aggiorna_kw_annui
-    ifelse (anno = 2012)
-    [
-      set kw_installed_yearly kW2012
-      output-print (word ">>>>>>>>>> Aggiorno kw_installed_yearly2012<<<<<<<<<" )
-    ]
-    [    
-      ifelse (anno = 2013)
-      [
-        set kw_installed_yearly kW2013
-        output-print (word ">>>>>>>>>> Aggiorno kw_installed_yearly 2013<<<<<<<<<" )
-      ]
-      [
-        ifelse (anno = 2014)
-        [
-          set kw_installed_yearly kW2014
-          output-print (word ">>>>>>>>>> Aggiorno kw_installed_yearly 2014<<<<<<<<<" )
-        ]  
-        [
-          ifelse (anno = 2015)
-          [
-            set kw_installed_yearly kW2015
-            output-print (word ">>>>>>>>>> Aggiorno kw_installed_yearly 2015<<<<<<<<<" )
-          ]
-          [
-            ifelse(anno = 2016)
-            [
-              set kw_installed_yearly kW2016
-              output-print (word ">>>>>>>>>> Aggiorno kw_installed_yearly 2016<<<<<<<<<" )
-            ]
-            [
-              if(anno = 2017) ;; nel 2017 in realtà non viene installata nuova potenza quindi lascio semplicemente il valore dell'anno passato
-              [
-                set kw_installed_yearly kW2016
-              ] 
-            ]
-          ]
-        ]    
-      ]
-    ]
+  
+    ifelse anno = 2007 [ set kw_installed_yearly kW2007 output-print (word ">>>>>>>>>> Aggiorno kw_installed_yearly2007 <<<<<<<<<" ) ][
+    ifelse anno = 2008 [ set kw_installed_yearly kW2008 output-print (word ">>>>>>>>>> Aggiorno kw_installed_yearly2008 <<<<<<<<<" ) ][
+    ifelse anno = 2009 [ set kw_installed_yearly kW2009 output-print (word ">>>>>>>>>> Aggiorno kw_installed_yearly2009 <<<<<<<<<" ) ][
+    ifelse anno = 2010 [ set kw_installed_yearly kW2010 output-print (word ">>>>>>>>>> Aggiorno kw_installed_yearly2010 <<<<<<<<<" ) ][
+    ifelse anno = 2011 [ set kw_installed_yearly kW2011 output-print (word ">>>>>>>>>> Aggiorno kw_installed_yearly2011 <<<<<<<<<" ) ][
+    ifelse anno = 2012 [ set kw_installed_yearly kW2012 output-print (word ">>>>>>>>>> Aggiorno kw_installed_yearly2012 <<<<<<<<<" ) ][
+    ifelse anno = 2013 [ set kw_installed_yearly kW2013 output-print (word ">>>>>>>>>> Aggiorno kw_installed_yearly2013 <<<<<<<<<" ) ][
+    ifelse anno = 2014 [ set kw_installed_yearly kW2014 output-print (word ">>>>>>>>>> Aggiorno kw_installed_yearly2014 <<<<<<<<<" ) ][
+    ifelse anno = 2015 [ set kw_installed_yearly kW2015 output-print (word ">>>>>>>>>> Aggiorno kw_installed_yearly2015 <<<<<<<<<" ) ][
+    ifelse anno = 2016 [ set kw_installed_yearly kW2016 output-print (word ">>>>>>>>>> Aggiorno kw_installed_yearly2016 <<<<<<<<<" ) ][
+      ;; default case 
+      set kw_installed_yearly kW2016 ;; da quando non viene installata nuova potenza quindi lascio semplicemente il valore dell'anno passato
+    ]]]]]]]]]]
+    
 end
 
 ;; CALCOLA LA PERCENTUALE DI AGENTI CHE DECIDONO DI EFFETTUARE L'IMPIANTO
@@ -1168,10 +1083,10 @@ end
 
 ;; PROCEDURA PER LA LETTURA DEI PREZZI MINIMI EFFETIVAMENTE APPLICATI DAL GSE NEL 2008-2012 (dati prelevati da file in cartella di lancio)
 to calcola_prezzi_minimi_gse
-  set prezzi_minimi_gse []
-  ifelse (anno_realizzazione = 2007 and file-exists? "PrezziMinimi2008.txt" ) ;; in realtà nel 2007 non è ancora previsto il ritiro dedicato --> modello semplificato
+  
+  ifelse (anno = 2007 and file-exists? "PrezziMinimi2008.txt" ) ;; in realtà nel 2007 non è ancora previsto il ritiro dedicato --> modello semplificato
   [
-    file-open "PrezziMinimi2007.txt"
+    file-open "PrezziMinimi2008.txt"
                while [ not file-at-end? ]
                [
                  let letto file-read
@@ -1180,7 +1095,7 @@ to calcola_prezzi_minimi_gse
                file-close
   ]
   [;; else non 2007
-    ifelse (anno_realizzazione = 2008 and file-exists? "PrezziMinimi2008.txt" )
+    ifelse (anno = 2008 and file-exists? "PrezziMinimi2008.txt" )
     [
       file-open "PrezziMinimi2008.txt"
                while [ not file-at-end? ]
@@ -1191,7 +1106,7 @@ to calcola_prezzi_minimi_gse
                file-close
     ]
     [;; else non 2008
-      ifelse (anno_realizzazione = 2009 and file-exists? "PrezziMinimi2009.txt" )
+      ifelse (anno = 2009 and file-exists? "PrezziMinimi2009.txt" )
       [
         file-open "PrezziMinimi2009.txt"
                while [ not file-at-end? ]
@@ -1202,7 +1117,7 @@ to calcola_prezzi_minimi_gse
                file-close
       ]
       [;; else non 2009
-        ifelse (anno_realizzazione = 2010 and file-exists? "PrezziMinimi2010.txt" )
+        ifelse (anno = 2010 and file-exists? "PrezziMinimi2010.txt" )
         [
           file-open "PrezziMinimi2010.txt"
                while [ not file-at-end? ]
@@ -1213,7 +1128,7 @@ to calcola_prezzi_minimi_gse
                file-close
         ]
         [;; else non 2010
-          ifelse (anno_realizzazione = 2011 and file-exists? "PrezziMinimi2011.txt" )
+          ifelse (anno = 2011 and file-exists? "PrezziMinimi2011.txt" )
           [
             file-open "PrezziMinimi2011.txt"
                while [ not file-at-end? ]
@@ -1224,7 +1139,7 @@ to calcola_prezzi_minimi_gse
                file-close
           ]
           [;; else non 2011
-            if(semestre_realizzazione = 1 and file-exists? "PrezziMinimi2012.txt" ) ;; nel 2012 i prezzi minimi hanno senso solo nel primo semestre, quando è in vigore ancora il Quarto CE
+            if(time = 1 and anno = 2012 and file-exists? "PrezziMinimi2012.txt" ) ;; nel 2012 i prezzi minimi hanno senso solo nel primo semestre, quando è in vigore ancora il Quarto CE
             [
                file-open "PrezziMinimi2012.txt"
                while [ not file-at-end? ]
@@ -1611,9 +1526,12 @@ to aggiorna_prezzi
   set costo_kwh_fascia3  precision (costo_kwh_fascia3 + ( (costo_kwh_fascia3  *  variazione_annuale_prezzi_elettricita ) / 100) ) 3
   set costo_kwh_fascia4 precision (costo_kwh_fascia4 + ( (costo_kwh_fascia4  *  variazione_annuale_prezzi_elettricita ) / 100) ) 3
   set costo_kwh_fascia5 precision (costo_kwh_fascia5 + ( (costo_kwh_fascia5  *  variazione_annuale_prezzi_elettricita )  / 100) )3
+  
+  ;; nella versione con CE questi prezzi minimi gse non sono usati e quindi è inutile aggiornarli --> vengono usate serie storiche
   set prezzi_minimi_gsef1 precision  ( prezzi_minimi_gsef1 +  ( (prezzi_minimi_gsef1  *  variazione_annuale_prezzi_elettricita )  / 100 ) ) 3
   set prezzi_minimi_gsef2 precision  (prezzi_minimi_gsef2 +  ( (prezzi_minimi_gsef2  *  variazione_annuale_prezzi_elettricita )  / 100 ) )3
   set prezzi_minimi_gsef3 precision  (prezzi_minimi_gsef3 +  ( (prezzi_minimi_gsef3  *  variazione_annuale_prezzi_elettricita )  / 100 ) ) 3
+  
   set Costo_Medio_kwP (Costo_Medio_kwP  -  round ( (Costo_Medio_kwP * Riduzione_anno_%costo_pannello ) / 100) )
 end
 
@@ -1669,13 +1587,24 @@ to aggiorna_ricavi
   [
     calcola_ricavi_da_autoconsumo;cosa ho risparmiato producendo da me l'energia
     calcola_costi_energia_prelevata
-    ifelse ( anno_realizzazione = 2012 )
-    [
-      calcola_ricavi_impianti_2012
+    
+    ;; ricavi calcolati senza i CE, vecchia versione
+    ;; ifelse ( anno_realizzazione = 2012 )
+    ;; [
+    ;;   calcola_ricavi_impianti_2012
+    ;; ]
+    ;; [
+    ;;  calcola_ricavi_impianti_non2012 vecchio nome della funzione, prima di estensione con CE
+    ;; ]
+    
+    ifelse( conto_energia = 2 or conto_energia = 3 or conto_energia = 4)
+    [;; Secondo, Terzo e Quarto Conto Energia
+      calcola_ricavi_impianti_CE_2_3_4
     ]
-    [
-      calcola_ricavi_impianti_non2012
+    [;; Quinto Conto ENergia
+      calcola_ricavi_impianti_CE_5
     ]
+    
     calcola_flusso_di_cassa
   ]
 end
@@ -1739,8 +1668,29 @@ end
 ;; procedura per il calcolo dei ricavi degli impianti con Secondo, Terzo e Quarto CE
 ;; per ora il modello simulato prevede il Ritiro Dedicato per tutti i Conti Energia e classi di potenza/impianti
 to calcola_ricavi_impianti_CE_2_3_4
-  
-  
+  let ricavo_incentivo precision ( kw_annui_impianto *  tariffa_incentivante ) 2
+  set ricavi_incentivi lput ricavo_incentivo ricavi_incentivi
+  ;; ritiro dedicato --> gestione kw immessi
+  if ( fascia_potenza  <= 6 )
+  [ ;; per ora vale per gli impianti di qualsiasi potenza..
+    let prezzi_minimi_gse_temp 0
+    output-print  (word   "calcola_ricavi_impianti_CE_2_3_4: prezzi_minimi_gse" prezzi_minimi_gse)
+    ifelse ( kw_immessi < 500000 )
+      [
+        set prezzi_minimi_gse_temp item 0 prezzi_minimi_gse
+      ]
+      [
+        ifelse ( kw_immessi >= 500000 and kw_immessi < 1000000 )
+        [
+          set prezzi_minimi_gse_temp item 1 prezzi_minimi_gse
+        ]
+        [
+          set prezzi_minimi_gse_temp item 2 prezzi_minimi_gse
+        ]
+      ]
+      let ricavo_vendita precision ( kw_immessi * prezzi_minimi_gse_temp ) 2
+      set ricavi_vendita lput ricavo_vendita ricavi_vendita
+  ]
   ;; vedi procedura calcola_ricavi_impianti_2012 --> per gli impianti di classe 6 non si applica il Ritiro Dedicato ma dovrebbero essere implementati meccanismi diretti
 end
 
@@ -2459,7 +2409,7 @@ Costo_Medio_kwP
 Costo_Medio_kwP
 3000
 5000
-1633
+1536
 50
 1
 euro
@@ -2604,7 +2554,7 @@ costo_kwh_fascia1
 costo_kwh_fascia1
 0.250
 0.299
-0.434
+0.45
 0.001
 1
 euro\KWh
@@ -2619,7 +2569,7 @@ costo_kwh_fascia2
 costo_kwh_fascia2
 0.140
 0.189
-0.251
+0.261
 0.001
 1
 euro\KWh
@@ -2634,7 +2584,7 @@ costo_kwh_fascia3
 costo_kwh_fascia3
 0.170
 0.219
-0.303
+0.314
 0.001
 1
 euro\KWh
@@ -2649,7 +2599,7 @@ costo_kwh_fascia4
 costo_kwh_fascia4
 0.220
 0.269
-0.385
+0.399
 0.001
 1
 euro\KWh
@@ -2664,7 +2614,7 @@ costo_kwh_fascia5
 costo_kwh_fascia5
 0.250
 0.299
-0.43
+0.446
 0.001
 1
 euro\KWh
@@ -3920,25 +3870,25 @@ percpositive
 11
 
 SLIDER
-1279
-790
-1537
-823
+1274
+943
+1532
+976
 BudgetRegione2013
 BudgetRegione2013
 0
 10
-0
+0.1
 0.1
 1
 milioni
 HORIZONTAL
 
 SLIDER
-1279
-833
-1537
-866
+1272
+989
+1530
+1022
 BudgetRegione2014
 BudgetRegione2014
 0
@@ -3950,10 +3900,10 @@ milioni
 HORIZONTAL
 
 SLIDER
-1280
-875
-1538
-908
+1274
+1039
+1532
+1072
 BudgetRegione2015
 BudgetRegione2015
 0
@@ -3965,10 +3915,10 @@ milioni
 HORIZONTAL
 
 SLIDER
-1278
-921
-1536
-954
+1274
+1084
+1532
+1117
 BudgetRegione2016
 BudgetRegione2016
 0
@@ -3996,6 +3946,81 @@ false
 "" ""
 PENS
 "kW" 1.0 0 -13345367 true "" "plot kw_installed_yearly"
+
+SLIDER
+1274
+902
+1532
+935
+BudgetRegione2012
+BudgetRegione2012
+0
+10
+0
+0.1
+1
+milioni
+HORIZONTAL
+
+SLIDER
+1280
+748
+1534
+781
+BudgetRegione2008
+BudgetRegione2008
+0
+10
+0
+0.1
+1
+milioni
+HORIZONTAL
+
+SLIDER
+1276
+789
+1530
+822
+BudgetRegione2009
+BudgetRegione2009
+0
+10
+0
+0.1
+1
+milioni
+HORIZONTAL
+
+SLIDER
+1275
+827
+1529
+860
+BudgetRegione2010
+BudgetRegione2010
+0
+10
+0
+0.1
+1
+milioni
+HORIZONTAL
+
+SLIDER
+1274
+865
+1528
+898
+BudgetRegione2011
+BudgetRegione2011
+0
+10
+0
+0.1
+1
+milioni
+HORIZONTAL
 
 @#$#@#$#@
 ## CREDITS AND REFERENCES

@@ -32,6 +32,31 @@ globals [ wacc m2Kwp  count_tick scala_dim_impianto time anno number durata_impi
   r2007 r2008 r2009 r2010 r2011
   ;; ogni agente può accedere a prezzi minimi diversi in base all'anno di entrata in esercizio --> lista di 3 elementi, per le diverse quantità di energia immessa
   prezzi_minimi_gse ;; 
+  ;; variabili per tenere traccia del numero totale di kw istallati con i diversi Conti  Energia
+  kW_2CE
+  kW_3CE
+  kW_5CE
+  kW_4CE
+  ;; variabili per tenere traccia del numero di kW installati con i diversi CE ogni anno
+  ;; anni del Secondo CE
+  kW_2CE_2007
+  kW_2CE_2008
+  kW_2CE_2009
+  kW_2CE_2010
+  kW_2CE_2011 ;; solo primo semestre
+  kW_3CE_2011 ;; solo primo semestre
+  kW_4CE_2011 ;; solo secondo semestre
+  kW_4CE_2012 ;; solo primo semestre
+  kW_5CE_2012 ;; solo secondo semestre
+  kW_5CE_2013 
+  ;; variabili per tenere traccia del numero totale di kw istallati divisi per fascia di potenza
+  kW_1FP kW_2FP kW_3FP kW_4FP kW_5FP kW_6FP
+  ;; variabili per tenere traccia del numero totale di impianti PV istallati divisi per fascia di potenza
+  count_pf_1FP count_pf_2FP count_pf_3FP count_pf_4FP count_pf_5FP count_pf_6FP
+  ;; agenti che non istallano impianto, divisi per classe di potenza
+  morti_FP_1 morti_FP_2 morti_FP_3 morti_FP_4 morti_FP_5 morti_FP_6
+  ;; informazioni per testare il funzionamento di valori casuali
+  rand_FP1 rand_FP2 rand_FP3 rand_FP4 rand_FP5 rand_FP6
 ]
 
 ;; DEFINIZIONE AGENTI E ATTRIBUTI AGENTI
@@ -145,7 +170,7 @@ to go
   aggiorna_budget
   
   ;; LA SIMULAZIONE SI INTERROMPE PER PERMETTERE ALL'UTENTE DI SETTARE EVENTUALI STRUMENTI INCENTIVANTI 
-  if (anno <= 2013 );creo altri agenti
+  if (anno <= 2013);creo altri agenti
   [
     if (Incentivi_Dinamici)
     [
@@ -165,7 +190,9 @@ to go
     ]
     create_pf
   ]
-  aggiorna_kw_annui
+  
+  if(time = 2)
+  [ aggiorna_kw_annui ]
   
   if (anno = 2014);ora non creo più nulla faccio solo evolvere
   [
@@ -180,6 +207,8 @@ to go
     ;; stampa_agenti  ;; commentato per non appesantire output, usare in fase di debug
     stampa_resoconto
     update_plot_roe
+    update_plot_kw_bars
+    
     print_simulation_info
     output-print (word "--------------------------------------------------------------------------------------------------------------------------------------------------------")
     output-print (word "---------------------------------------------------------------------FINE SIMULAZIONE-------------------------------------------------------------------")
@@ -188,6 +217,9 @@ to go
     
     ;;produco file utile per l'ottimizzatore
     write_pl_file
+    
+   ;;resetta alcune variabili per non avere probemi con simulazioni successive
+   reset_var
     
     stop 
   ]
@@ -234,6 +266,10 @@ to default
   set kW2010 0
   set kW2011 0
   set kWTOT 0
+  set kW_2CE 0
+  set kW_3CE 0
+  set kW_4CE 0
+  set kW_5CE 0
   set INCENTIVO_INST2012 0
   set INCENTIVO_INST2013 0
   set INCENTIVO_INST2014 0
@@ -307,6 +343,22 @@ to default
   clear-output
 end
 
+;;SETUP DI VARIABILI CHE VENGONO MODIFICATE IN 'GO' MA DEVONO ESSERE RIPRISTINATE AI VALORI INIZIALI NEL CASO DI ESECUZIONI SUCCESSIVE
+;; molto simile a default ma senza modificare la lettura da serie storica e random o il tipo di incentivo regionale
+to reset_var
+  set costo_kwh_fascia1 0.278
+  set costo_kwh_fascia2 0.162
+  set costo_kwh_fascia3 0.194
+  set costo_kwh_fascia4 0.246
+  set costo_kwh_fascia5 0.276
+  set Irradiazione_media_annua_kwh_kwp 1350 
+  set Tecnologia_Pannello  "Monocristallini" 
+  set Costo_Medio_kwP 4300 
+  set Tasso_lordo_rendimento_BOT 2.147
+  set variazione_annuale_prezzi_elettricita 1.8 
+  set Riduzione_anno_%costo_pannello 3
+  set Perdita_efficienza_annuale_pannello 0.5
+end
 
 ;; SETUP A RUN TIME DI VARIABILI GLOBALI CHE NON VENGONO VARIANO DURANTE L'ESECUZIONE
 to set_global
@@ -330,7 +382,24 @@ to set_global
   set count_pf 0;non ho ancroa creato nuessuno
   set WACC Tasso_lordo_rendimento_BOT 
   set scala_dim_impianto 0.5
+  
+  set morti_FP_1 0
+  set morti_FP_2 0
+  set morti_FP_3 0
+  set morti_FP_4 0
+  set morti_FP_5 0
+  set morti_FP_6 0
+  
+  set rand_FP1 0
+  set rand_FP2 0
+  set rand_FP3 0
+  set rand_FP4 0
+  set rand_FP5 0
+  set rand_FP6 0
+  
   set NAgentiFINAL NumeroAgenti;quanti crearne per semestre
+  ;; set NAgentiFINAL 200
+  
   ifelse (Tecnologia_Pannello = "Monocristallini"  )
   [
     set m2Kwp  8;migliore tecnologia
@@ -355,17 +424,99 @@ to genera_random
   set random_m2 []
   set random_bgt []
   set random_consumo []
-  while [ c <  ( NAgentiFINAL ) ];riempio le liste
+  ;; while [ c <  ( NAgentiFINAL ) ];riempio le liste   ---> problema: inserisce solo NAgenti valori random, utilizzati in tutti i semestri!
+  while [ c < ( NAgentiFINAL * 2 * (2013 - 2007 + 1) ) ] ;; inserisco tanti valori random quanti sono i semestri, così ogni singolo agente disporrà di valori differenti
   [
     set c c + 1 
-    set number 1 + random 100  
-    set random_ostinazione lput  number random_ostinazione ;lista ostinazione
-    set number 1 + random-float 9   
-    set random_m2 lput number random_m2;lista metri quadri
-    set number 1 + random-float 9   
-    set random_bgt lput number random_bgt;lista budget
-    set number 1 + random-float 9  
-    set random_consumo lput number random_consumo;lista consumo 
+    
+    ;; vecchi valori (tesi Croce) - ne ho messi altri che mi sembravano più sensati
+    ;; set number 1 + random 100  
+    ;; set random_ostinazione lput  number random_ostinazione ;lista ostinazione
+    ;; set number 1 + random-float 9   
+    ;; set random_m2 lput number random_m2;lista metri quadri
+    ;; set number 1 + random-float 9   
+    ;; set random_bgt lput number random_bgt;lista budget
+    ;; set number 1 + random-float 9  
+    ;; set random_consumo lput number random_consumo;lista consumo 
+    
+    
+    ;; random ostinazione
+    set number round random-normal 75 20
+    if (number < 1 ) [set number 1 ]   
+    if (number > 100 ) [set number 100 ]   
+    set random_ostinazione lput  number random_ostinazione 
+    
+    
+    ;;per simulare come effettivamente gli impianti PV installati nel 2007-2013 siano distribuiti per classe di potenza, mi avvalgo dei dati forniti dal GSE sulla distribuzione reale
+    ;; 32.37% Fascia 1, 56.39% Fascia 2, 8.93% Fascia 3, 2.11% Fascia 4, 0.17% Fascia 5, 0.03% Fascia 6
+    ;; è necessario inserire anche valori adeguati per il budget disponibile, poiché con i vecchi valori (in genere minori di qualche centinaia di migliaia di euro) non è possibile 
+    ;; realizzare impianti di dimensioni maggiori (fascie 4,5,6) --> con stime del 2011 il prezzo degli impianti 'chiavi in mano' è: 9000euro per impianti da 3kW, 400,000euro per impianti
+    ;; da 200kW e 1,700,000euro per 1MW - questi valori servono solo per stimare i budget di cui gli agenti interessati a grandi impianti devono essere dotati
+    set number random 10000
+    let rndm_m2 0
+    ;; ricordiamo che in genera_pf il budget letto dalle liste casuali è comunque moltiplicato di un fattore compreso tra 10k-200k
+    let rndm_budget 0
+    set rndm_budget 1 + random-float 9
+    
+    ;; con i valori medi utilizzati dal modello originale per il consumo annuo (usato per calcolare la dimensione dell'impianto desiderato) gli impianti di fascia 1 non sono mai considerati
+    ;; economici, anche dopo il ridimensionamento - probabilmente nella realtà chi li costruisce non si aspetta di coprire interamente il suo fabbbisogno con tali impianti
+    ;; pre riflettere la situazione reale, in cui molti impianti di fascia 1 sono installati, il valore casuale del consumo viene opportunamente diminuito per tali impianti
+    let rndm_consumo 0
+    set rndm_consumo 1 + random-float 9
+    ifelse (number < 5639)[ ;; fascia 2 3kW<P<=20kW -->   3kW*m2KWp<m2<=20kW
+      ;;set rndm_m2 (3 * m2Kwp) + random-float (20 * m2Kwp)
+      set rndm_m2 (3 * m2Kwp) + random-float (15 * m2Kwp)
+      set rndm_consumo rndm_consumo * 0.5
+      
+      set rand_FP2 rand_FP2 + 1
+    ][
+    ifelse (number < (5639 + 3237) and number > 5639)[ ;; fascia 1 1kW<P<=3kW
+      ;; set rndm_m2 (1 * m2Kwp) + random-float (3 * m2Kwp)
+       set rndm_m2  m2Kwp + random-float (2 * m2Kwp)
+      
+      set rndm_consumo rndm_consumo * 0.1 ;; 0.1 è un parametro trovato per tentativi
+      
+      set rand_FP1 rand_FP1 + 1
+      ;; output-print  (word   "*Genera random fascia 1: m2 " rndm_m2) 
+    ][
+    ifelse (number < (5639 + 3237 + 893) and number > (5639 + 3237) )[ ;; fascia 3 20kW<P<=200kW
+      set rndm_m2 (20 * m2Kwp) + random-float (180 * m2Kwp)
+      set rndm_consumo rndm_consumo * 0.7
+      
+      set rand_FP3 rand_FP3 + 1
+    ][
+    ifelse (number < (5639 + 3237 + 893 + 211) and number > (5639 + 3237 + 893) )[ ;; fascia 4 200kW<P<=1000kW
+      set rndm_m2 (200 * m2Kwp) + random-float (800 * m2Kwp)
+      set rndm_budget rndm_budget * 15
+      
+      set rand_FP4 rand_FP4 + 1
+    ][
+    ifelse (number < (5639 + 3237 + 893 + 211 + 17) and number > (5639 + 3237 + 893 + 211) )[ ;; fascia 5 1000kW<P<=5000kW
+      set rndm_m2 (1000 * m2Kwp) + random-float (4000 * m2Kwp)
+      set rndm_budget rndm_budget * 100
+      
+      set rand_FP5 rand_FP5 + 1
+    ][
+    ifelse (number < (5639 + 3237 + 893 + 211 + 17 + 3) and number > (5639 + 3237 + 893 + 211 + 17) )[ ;; fascia 6 P>5000kW
+      set rndm_m2 (5000 * m2Kwp) + random-float (50000 * m2Kwp) ;; supponiamo per ora un limite massimo anche per gli impianti di fascia 6, cioè 50000kW
+      set rndm_budget rndm_budget * 500
+      
+      set rand_FP6 rand_FP6 + 1
+    ][
+      ;; default case  --> non dovremmo mai fnire qui, se ciò dovesse accadere creiamo comunque un impianto di fascia 2
+      set rndm_m2 (3 * m2Kwp) + random-float (15 * m2Kwp)
+     
+      set rand_FP2 rand_FP2 + 1
+    ]]]]]]
+    
+    set random_m2 lput rndm_m2 random_m2
+    set random_bgt lput rndm_budget random_bgt
+    set random_consumo lput rndm_consumo random_consumo
+    
+    ;; per controllare generazione di lista valori random
+    file-open "/media/sda4/ePolicy/simulationModel/output/random_list.pl"
+    ;; file-print (word "rndm_value("rndm_m2",   ----   " rndm_budget ",   ----  "rndm_consumo ")")
+    file-close
     
   ]
 end
@@ -396,6 +547,9 @@ to create_pf
         genera_pf;legge da file o da lista le variabili dell'agente
         set valutaincentivi true
         
+        ;;output-print  (word   "DEBUG PRIMA DELLA VALUTAZIONE FATTIBILITÀ") 
+        ;;output-print  (word   "------------>>> AGENTE " id  " M2 Disponibili " M2Disposizione " Budget " budget " Consumo Annuale " consumo_medio_annuale) 
+        
         ;; valutazione fattibilità impianto versione iniziale (Croce+Cerri)
         valuta_fattibilita_impianto;se farà l'impianto con gli incentivi regionali o no??
         if morto = true;se la valutazione con gli incentivi non mi conviene provo senza incentivi
@@ -407,7 +561,7 @@ to create_pf
         
         ;; stima del roe
         set roe_stimato 0 ; per inizializzarlo
-        ;; stima_roe
+        stima_roe
         ;; output-print  (word   "------------>>> AGENTE " id  "  Roe stimato per l'investimento: " roe_stimato) 
         ;; output-print  (word   "----DEBUG------------>>> AGENTE " id  "  stima_flusso_cassa_cumulato: " stima_flusso_cassa_cumulato) 
         ;; output-print  (word   "----DEBUG------------>>> AGENTE " id  "  costo_impianto: " costo_impianto) 
@@ -479,9 +633,14 @@ to genera_pf
       [;else random, li prendo dalle liste
        ;;PROCEDURA SERIE CASUALI PRELEVANDO DA LISTE
         set %ostinazione item  (id - ( NAgentiFINAL * count_tick ) - 1 ) random_ostinazione 
-        set consumo_medio_annuale round  (item  (id - ( NAgentiFINAL * count_tick ) - 1 ) random_consumo ) * Consumo_medio_annuale_KWh
+        ;; vecchia versione, con approssimazione a intero
+        ;; set consumo_medio_annuale round  (item  (id - ( NAgentiFINAL * count_tick ) - 1 ) random_consumo ) * Consumo_medio_annuale_KWh
+        set consumo_medio_annuale (item  (id - ( NAgentiFINAL * count_tick ) - 1 ) random_consumo ) * Consumo_medio_annuale_KWh
         set budget round (item  (id - ( NAgentiFINAL * count_tick ) - 1 ) random_bgt )  * Budget_Medio_MiliaiaEuro * 1000
-        set M2disposizione round (item  (id - ( NAgentiFINAL * count_tick ) - 1 ) random_m2 )  * M2_Disposizione
+        ;; vecchia versione per stabilire i m2 a disposizione, in cui occoreva anche moltiplicare per il parametro impostato da interfaccia
+        ;;set M2disposizione round (item  (id - ( NAgentiFINAL * count_tick ) - 1 ) random_m2 )  * M2_Disposizione
+        ;; nuova versione: il valore di m2 è un valore casuale già correttamente impostato
+        set M2disposizione round (item  (id - ( NAgentiFINAL * count_tick ) - 1 ) random_m2 )
         set %cop_cosumi  Media%_copertura_consumi_richiesta
         
         
@@ -609,6 +768,8 @@ end
 
 ;; PROCEDURA VALUTAZIONE FATTIBILITA' INVESTIMENTO (V. FLOW CHART)
 to valuta_fattibilita_impianto
+  calcola_fascia_potenza
+  ;;output-print  (word   "************** AGENTE " id  " dim_im: " dimensione_impianto " m2 disposizione: " M2disposizione " costo im: " costo_impianto " budget " budget) 
   ifelse (dimensione_impianto <=  M2disposizione ) and (costo_impianto - ifin + intRegione <=  budget );tutto perfetto
     [
       set color green
@@ -699,6 +860,14 @@ to muori
   ifelse valutaincentivi = false
   [
     set totdied  totdied + 1  
+    ifelse fascia_potenza = 1 [ set morti_FP_1 morti_FP_1 + 1 ][
+    ifelse fascia_potenza = 2 [ set morti_FP_2 morti_FP_2 + 1 ][
+    ifelse fascia_potenza = 3 [ set morti_FP_3 morti_FP_3 + 1 ][
+    ifelse fascia_potenza = 4 [ set morti_FP_4 morti_FP_4 + 1 ][
+    ifelse fascia_potenza = 5 [ set morti_FP_5 morti_FP_5 + 1 ][
+    ifelse fascia_potenza = 6 [ set morti_FP_6 morti_FP_6 + 1 ][
+      ;; default case
+    ]]]]]]
     die
   ]
   [
@@ -728,6 +897,7 @@ end
 ;; VALUTAZIONE RIDIMENSIONAMENTO POTENZA E DIMENSIONE IMPIANTO
 to accetta_ridimensionamento
   let dimensione_eccedenza dimensione_impianto - M2disposizione
+  ;; output-print  (word   " Ridimensionamento ************** AGENTE " id  " dim_im: " dimensione_impianto " m2 disposizione: " M2disposizione " costo im: " costo_impianto " budget " budget "dim_ecc; " dimensione_eccedenza ) 
   ifelse (dimensione_eccedenza <= round ( ( M2disposizione * ( %ostinazione + influenza * sensibilita )) / 100 ) )
     [
       ;;set size dimensione_impianto / scala_dim_impianto
@@ -832,8 +1002,8 @@ end
 
 ;;PROCEDURA ASSEGNAZIONE FASCIA POTENZA da 1 a 6
 to calcola_fascia_potenza
-  set potenza_impianto dimensione_impianto / m2Kwp;caolcolo potenza impianto
-  ifelse ( potenza_impianto > 1 and potenza_impianto <= 3 )
+  set potenza_impianto dimensione_impianto / m2Kwp;calcolo potenza impianto
+  ifelse ( potenza_impianto >= 1 and potenza_impianto <= 3 )
     [
       set fascia_potenza  1
       set size  (scala_dim_impianto + 0.4) * fascia_potenza
@@ -902,7 +1072,7 @@ end
 
 ;; OBSERVER AGGIORNA LA POTENZA INSTALLATA
 to aggiorna_kW
-  ;; aggiornamento potenza impianti per ogni anno
+  ;; aggiornamento potenza impianti installati annualmente
   ifelse anno_realizzazione = 2007 [ set kW2007 kW2007 + potenza_impianto ][
   ifelse anno_realizzazione = 2008 [ set kW2008 kW2008 + potenza_impianto ][
   ifelse anno_realizzazione = 2009 [ set kW2009 kW2009 + potenza_impianto ][
@@ -916,9 +1086,53 @@ to aggiorna_kW
        ;; default case 
   ]]]]]]]]]]
   
+  aggiorna_kw_CE
+  aggiorna_kw_FP
+  
   ;; aggiornamento kWTOTALI
   set kWTOT kWTOT + potenza_impianto
 end
+
+
+;; aggiorna la potenza installata suddivisa per Conto Energia 
+to aggiorna_kw_CE
+  ;; aggiornamento potenza impianti installati per CE
+  ifelse conto_energia = 2 [ set kW_2CE kW_2CE + potenza_impianto][
+  ifelse conto_energia = 3 [ set kW_3CE kW_3CE + potenza_impianto][
+  ifelse conto_energia = 4 [ set kW_4CE kW_4CE + potenza_impianto][
+  ifelse conto_energia = 5 [ set kW_5CE kW_5CE + potenza_impianto][
+    ;; default case
+  ]]]]
+  
+  ;; aggiornamento potenza impianti installati annualmente per CE
+  ifelse (anno_realizzazione = 2007 and conto_energia = 2) [ set kW_2CE_2007 kW_2CE_2007 + potenza_impianto][
+  ifelse (anno_realizzazione = 2008 and conto_energia = 2) [ set kW_2CE_2008 kW_2CE_2008 + potenza_impianto][
+  ifelse (anno_realizzazione = 2009 and conto_energia = 2) [ set kW_2CE_2009 kW_2CE_2009 + potenza_impianto][
+  ifelse (anno_realizzazione = 2010 and conto_energia = 2) [ set kW_2CE_2010 kW_2CE_2010 + potenza_impianto][  
+  ifelse (anno_realizzazione = 2011 and conto_energia = 2) [ set kW_2CE_2011 kW_2CE_2011 + potenza_impianto][
+  ifelse (anno_realizzazione = 2011 and conto_energia = 3) [ set kW_3CE_2011 kW_3CE_2011 + potenza_impianto][
+  ifelse (anno_realizzazione = 2011 and conto_energia = 4) [ set kW_4CE_2011 kW_4CE_2011 + potenza_impianto][
+  ifelse (anno_realizzazione = 2012 and conto_energia = 4) [ set kW_4CE_2012 kW_4CE_2012 + potenza_impianto][
+  ifelse (anno_realizzazione = 2012 and conto_energia = 5) [ set kW_5CE_2012 kW_5CE_2012 + potenza_impianto][
+  ifelse (anno_realizzazione = 2013 and conto_energia = 5) [ set kW_5CE_2013 kW_5CE_2013 + potenza_impianto][
+    ;; default case
+  ]]]]]]]]]]
+end
+
+;; aggiorna la potenza installata suddivisa per Fascia Potenza
+to aggiorna_kw_FP
+  ;; aggiornamento potenza impianti installati per FP
+  ifelse fascia_potenza = 1 [ set kW_1FP kW_1FP + potenza_impianto][
+  ifelse fascia_potenza = 2 [ set kW_2FP kW_2FP + potenza_impianto][
+  ifelse fascia_potenza = 3 [ set kW_3FP kW_3FP + potenza_impianto][
+  ifelse fascia_potenza = 4 [ set kW_4FP kW_4FP + potenza_impianto][
+  ifelse fascia_potenza = 5 [ set kW_5FP kW_5FP + potenza_impianto][
+  ifelse fascia_potenza = 6 [ set kW_6FP kW_6FP + potenza_impianto][
+    ;; default case
+  ]]]]]]
+  
+end
+
 
 ;; OBSERVER AGGIORNA IL COUNT DEGLI AGENTI
 to aggiorna_pf
@@ -935,6 +1149,20 @@ to aggiorna_pf
   ifelse anno_realizzazione = 2016 [ set count_pf2016 count_pf2016 + 1 ][
        ;; default case 
   ]]]]]]]]]]
+  
+  aggiorna_pf_FP
+end
+
+;; aggiorna il numero di impianti PV divisi per Fascia Potenza
+to aggiorna_pf_FP
+  ifelse fascia_potenza = 1 [ set count_pf_1FP count_pf_1FP + 1][
+  ifelse fascia_potenza = 2 [ set count_pf_2FP count_pf_2FP + 1][
+  ifelse fascia_potenza = 3 [ set count_pf_3FP count_pf_3FP + 1][
+  ifelse fascia_potenza = 4 [ set count_pf_4FP count_pf_4FP + 1][
+  ifelse fascia_potenza = 5 [ set count_pf_5FP count_pf_5FP + 1][
+  ifelse fascia_potenza = 6 [ set count_pf_6FP count_pf_6FP + 1][
+    ;; default case
+  ]]]]]]
 end
 
 ;; OBSERVER AGGIORNA SPESA INCENTIVI INSTALLAZIONE
@@ -1019,19 +1247,32 @@ end
 ;; CALCOLA LA PERCENTUALE DI AGENTI CHE DECIDONO DI EFFETTUARE L'IMPIANTO
 to calcola_rapporto
   set perctotnegsoldi precision (totnegsoldi / (NAgentiFINAL * 10) * 100) 2
+  set percneg2007 precision (totneg2007 / (NAgentiFINAL * 2)* 100 ) 2
+  set percneg2008 precision (totneg2008 / (NAgentiFINAL * 2)* 100 ) 2
+  set percneg2009 precision (totneg2009 / (NAgentiFINAL * 2)* 100 ) 2
+  set percneg2010 precision (totneg2010 / (NAgentiFINAL * 2)* 100 ) 2
+  set percneg2011 precision (totneg2011 / (NAgentiFINAL * 2)* 100 ) 2
   set percneg2012 precision (totneg2012 / (NAgentiFINAL * 2)* 100 ) 2
   set percneg2013 precision (totneg2013 / (NAgentiFINAL * 2)* 100 ) 2
   set percneg2014 precision (totneg2014 / (NAgentiFINAL * 2)* 100 ) 2
   set percneg2015 precision (totneg2015 / (NAgentiFINAL * 2)* 100 ) 2
   set percneg2016 precision (totneg2016 / (NAgentiFINAL * 2)* 100 ) 2
   
+  set r2007  precision ((count_pf2007 * 100) / (NAgentiFINAL * 2)) 2
+  set r2008  precision ((count_pf2008 * 100) / (NAgentiFINAL * 2)) 2
+  set r2009  precision ((count_pf2009 * 100) / (NAgentiFINAL * 2)) 2
+  set r2010  precision ((count_pf2010 * 100) / (NAgentiFINAL * 2)) 2
+  set r2011  precision ((count_pf2011 * 100) / (NAgentiFINAL * 2)) 2
   set r2012  precision ((count_pf2012 * 100) / (NAgentiFINAL * 2)) 2
   set r2013  precision ((count_pf2013 * 100) / (NAgentiFINAL * 2)) 2
   set r2014  precision ((count_pf2014 * 100) / (NAgentiFINAL * 2)) 2
   set r2015  precision ((count_pf2015 * 100) / (NAgentiFINAL * 2)) 2
   set r2016  precision ((count_pf2016 * 100) / (NAgentiFINAL * 2)) 2
   
-  set percnegativa precision (totdied / (NAgentiFINAL * 10) * 100) 2
+  ;; in NAgentiFInal * 10 il 10 rappresenta il numero dei semestri considerati
+  ;; set percnegativa precision (totdied / (NAgentiFINAL * 10) * 100) 2
+  ;; nel periodo 2007-2013 i semestri sono 14
+  set percnegativa precision (totdied / (NAgentiFINAL * 14) * 100) 2
   set percpositive 100 - percnegativa
 end
 
@@ -1674,7 +1915,6 @@ to calcola_ricavi_impianti_CE_2_3_4
   if ( fascia_potenza  <= 6 )
   [ ;; per ora vale per gli impianti di qualsiasi potenza..
     let prezzi_minimi_gse_temp 0
-    output-print  (word   "calcola_ricavi_impianti_CE_2_3_4: prezzi_minimi_gse" prezzi_minimi_gse)
     ifelse ( kw_immessi < 500000 )
       [
         set prezzi_minimi_gse_temp item 0 prezzi_minimi_gse
@@ -1819,9 +2059,16 @@ to stima_roe
   let indice_vita_impianto 1
   
   ;; valori di default mantenuti costanti per tutta la vita dell'impanto --> per maggiore precisione dovrebbero essere aggiornati annualmente
-  let stima_prezzi_minimi_gsef1 0.103 
-  let stima_prezzi_minimi_gsef2 0.086
-  let stima_prezzi_minimi_gsef3 0.076
+  ;; vecchia versione senza CE
+  ;; let stima_prezzi_minimi_gsef1 0.103 
+  ;; let stima_prezzi_minimi_gsef2 0.086
+  ;; let stima_prezzi_minimi_gsef3 0.076
+  ;; prezzi minimi con CE sono presi da serie storiche e memorizzati nella lista corretta anno dopo anno --> il roe calcolato a runtime prende in considerazione tale lista e 
+  ;; quindi ne osserva le modifiche fatte annualmente, la stima del roe legge i prezzi minimi una volta sola e basa i suoi calcoli su un solo valore
+  let stima_prezzi_minimi_gsef1 item 0 prezzi_minimi_gse
+  let stima_prezzi_minimi_gsef2 item 1 prezzi_minimi_gse
+  let stima_prezzi_minimi_gsef3 item 2 prezzi_minimi_gse
+  
   let stima_costo_kwh_fascia1 costo_kwh_fascia1
   let stima_costo_kwh_fascia2 costo_kwh_fascia2
   let stima_costo_kwh_fascia3 costo_kwh_fascia3
@@ -1849,65 +2096,69 @@ to stima_roe
     ;; output-print ( word "----->>>> DEBUG -- indice_vita_impianto: " indice_vita_impianto " stima_consumo_medio_annuale: " stima_consumo_medio_annuale " stima_kw_annui_impianto " stima_kw_annui_impianto)
     ;; output-print ( word "----->>>> DEBUG -- stima_kw_autoconsumo: " stima_kw_autoconsumo " stima_kw_immessi: " stima_kw_immessi " stima_kw_prelevati " stima_kw_prelevati)
     ;; output-print ( word "----->>>> DEBUG -- Aumento_%annuo_consumi: " Aumento_%annuo_consumi " Perdita_efficienza_annuale_pannello: " Perdita_efficienza_annuale_pannello)
-        
+    
     ;; stima i ricavi da autoconsumo
-    ifelse ( stima_consumo_medio_annuale  < 1000 )
-    [
-      set stima_ric_autoconsumo precision ( stima_kw_autoconsumo * stima_costo_kwh_fascia1 ) 2
-    ]
-    [
-      ifelse ( stima_consumo_medio_annuale  >= 1000 and stima_consumo_medio_annuale < 2500 )
-        [
-          set stima_ric_autoconsumo   precision  ( stima_kw_autoconsumo * stima_costo_kwh_fascia2 ) 2 
-        ]
-        [
-          ifelse ( stima_consumo_medio_annuale >= 2500 and stima_consumo_medio_annuale < 5000 )
-          [
-            set stima_ric_autoconsumo  precision  ( stima_kw_autoconsumo * stima_costo_kwh_fascia3 ) 2
-          ]
-          [
-            ifelse ( stima_consumo_medio_annuale >= 5000 and stima_consumo_medio_annuale < 15000 )
-            [
-              set stima_ric_autoconsumo  precision  ( stima_kw_autoconsumo * stima_costo_kwh_fascia4 ) 2
-            ]
-            
-            [
-              set stima_ric_autoconsumo precision (  stima_kw_autoconsumo * stima_costo_kwh_fascia5 ) 2 
-            ]
-          ]
-          
-        ]
-    ] ;; fine stima ricavi autoconsumo
+    ifelse ( stima_consumo_medio_annuale < 1000 )[ set stima_ric_autoconsumo precision ( stima_kw_autoconsumo * stima_costo_kwh_fascia1 ) 2 ][
+    ifelse ( stima_consumo_medio_annuale >= 1000 and stima_consumo_medio_annuale < 2500 )[ set stima_ric_autoconsumo precision ( stima_kw_autoconsumo * stima_costo_kwh_fascia2 ) 2 ][
+    ifelse ( stima_consumo_medio_annuale >= 2500 and stima_consumo_medio_annuale < 5000 )[ set stima_ric_autoconsumo precision ( stima_kw_autoconsumo * stima_costo_kwh_fascia3 ) 2 ][
+    ifelse ( stima_consumo_medio_annuale >= 5000 and stima_consumo_medio_annuale < 15000 )[ set stima_ric_autoconsumo precision ( stima_kw_autoconsumo * stima_costo_kwh_fascia4 ) 2 ][
+      set stima_ric_autoconsumo precision (  stima_kw_autoconsumo * stima_costo_kwh_fascia5 ) 2 
+    ]]]] ;; fine stima ricavi autoconsumo
     
     ;; output-print ( word "----->>>> DEBUG -- indice_vita_impianto: " indice_vita_impianto " stima_ric_autoconsumo: " stima_ric_autoconsumo)
     ;; output-print ( word "----->>>> DEBUG -- costo_kwh_fascia1: " costo_kwh_fascia1 " costo_kwh_fascia2: " costo_kwh_fascia2 " costo_kwh_fascia3 " costo_kwh_fascia3)
     
+    
+    ;; ----------------------------------- stima ricavi impianti vecchia versione senza CE --------------------------------------
     ;; calcola stima ricavi impianti
-    ifelse ( anno_realizzazione = 2012 ) ;; impianti 2012
-    [
+    ;; ifelse ( anno_realizzazione = 2012 ) ;; impianti 2012
+    ;; [
+    ;;   set stima_ric_incentivo precision ( stima_kw_annui_impianto *  tariffa_incentivante ) 2
+    ;;   if ( fascia_potenza  <= 6 )
+    ;;   [
+    ;;     ifelse ( stima_kw_immessi < 500000 )
+    ;;     [
+    ;;       set stima_ric_vendita precision ( stima_kw_immessi * stima_prezzi_minimi_gsef1 ) 2
+    ;;     ]
+    ;;     [
+    ;;       ifelse ( stima_kw_immessi >= 500000 and stima_kw_immessi < 1000000 )
+    ;;       [
+    ;;         set stima_ric_vendita precision ( stima_kw_immessi * stima_prezzi_minimi_gsef2 ) 2
+    ;;       ]
+    ;;       [
+    ;;         set stima_ric_vendita precision ( stima_kw_immessi * stima_prezzi_minimi_gsef3 ) 2
+    ;;       ]
+    ;;     ]
+    ;;   ]
+    ;; ] ;; fine impianti 2012
+    ;; [ ;; impianti non 2012
+    ;;   set stima_ric_incentivo precision ( stima_kw_autoconsumo * tariffa_autoconsumo ) 2
+    ;;   set stima_ric_vendita precision ( stima_kw_immessi * tariffa_omnicomprensiva ) 2
+    ;;   ;; fine impianti non 2012
+    ;; ];; fine calcola ricavi impianti
+    ;; ----------------------------------- fine stima ricavi impianti vecchia versione senza CE --------------------------------------
+    
+    
+    ;; ----------------------------------- stima ricavi impianti nuova versione con CE --------------------------------------
+    
+    ifelse( conto_energia = 2 or conto_energia = 3 or conto_energia = 4)[
+      ;; ricavi impianti con CE 2-3-4
       set stima_ric_incentivo precision ( stima_kw_annui_impianto *  tariffa_incentivante ) 2
       if ( fascia_potenza  <= 6 )
-      [
-        ifelse ( stima_kw_immessi < 500000 )
-        [
-          set stima_ric_vendita precision ( stima_kw_immessi * stima_prezzi_minimi_gsef1 ) 2
-        ]
-        [
-          ifelse ( stima_kw_immessi >= 500000 and stima_kw_immessi < 1000000 )
-          [
-            set stima_ric_vendita precision ( stima_kw_immessi * stima_prezzi_minimi_gsef2 ) 2
-          ]
-          [
-            set stima_ric_vendita precision ( stima_kw_immessi * stima_prezzi_minimi_gsef3 ) 2
-          ]
-        ]
+      [ 
+        ifelse ( stima_kw_immessi < 500000 ) [ set stima_ric_vendita precision ( stima_kw_immessi * stima_prezzi_minimi_gsef1 ) 2 ][
+          ifelse ( stima_kw_immessi >= 500000 and stima_kw_immessi < 1000000 ) [ set stima_ric_vendita precision ( stima_kw_immessi * stima_prezzi_minimi_gsef2 ) 2 ][
+            set stima_ric_vendita precision ( stima_kw_immessi * stima_prezzi_minimi_gsef3 ) 2 
+          ]]
       ]
-    ] ;; fine impianti 2012
-    [ ;; impianti non 2012
+    ]
+    [ ;; ricavi impianti con CE 5
       set stima_ric_incentivo precision ( stima_kw_autoconsumo * tariffa_autoconsumo ) 2
       set stima_ric_vendita precision ( stima_kw_immessi * tariffa_omnicomprensiva ) 2
-      ;; fine impianti non 2012
-    ];; fine calcola ricavi impianti
+    ]
+    
+    
+    ;; ----------------------------------- fine stima ricavi impianti nuova versione con CE --------------------------------------
     
     ;; output-print ( word "----->>>> DEBUG -- indice_vita_impianto: " indice_vita_impianto " stima_ric_incentivo: " stima_ric_incentivo " stima_ric_vendita: " stima_ric_vendita)
     ;; output-print ( word "----->>>> DEBUG -- stima_kw_immessi: " stima_kw_immessi " prezzi_minimi_gsef1: " prezzi_minimi_gsef1)
@@ -1996,11 +2247,11 @@ to update_plot_roe
   let cry 0
   output-print      ("****************************************************************************************************")
   output-print ( word "***************************************************DATI ROE*****************************************") 
-  while [i <= 4]
+  while [i <= 9]
     [
-      set g precision ( (sum [roe%] of pf with  [anno_realizzazione = 2012 + i ] ) / (NAgentiFINAL * 2 ) ) 3
+      set g precision ( (sum [roe%] of pf with  [anno_realizzazione = 2007 + i ] ) / (NAgentiFINAL * 2 ) ) 3
       set-current-plot "Average_ROE"
-      set cry 2012 + i 
+      set cry 2007 + i 
       set-current-plot-pen (word cry)
       auto-plot-off
       plotxy ( cry - 1  ) 0
@@ -2009,6 +2260,34 @@ to update_plot_roe
       output-print ( word "Media ROE anno  "cry " :  " g "%" )
     ]  
 end
+
+;; UPDATE FINALE grafico con i kw istallati ogni anno, rappresentati come barre
+to update_plot_kw_bars
+  let i 0
+  let g 0
+  let cry 0
+  while [i <= 6]
+    [
+      set-current-plot "kW_installed_bars"
+      set cry 2007 + i 
+      ;; soluzione orribile per disegnare i kW istallati ogni anno --> molto migliorabile
+      ifelse cry = 2007 [ set g kW2007 ][
+      ifelse cry = 2008 [ set g kW2008 ][
+      ifelse cry = 2009 [ set g kW2009 ][
+      ifelse cry = 2010 [ set g kW2010 ][
+      ifelse cry = 2011 [ set g kW2011 ][
+      ifelse cry = 2012 [ set g kW2012 ][
+      ifelse cry = 2013 [ set g kW2013 ][
+        ;; default case 
+       ]]]]]]]
+      set-current-plot-pen (word cry)
+      auto-plot-off
+      plotxy ( cry - 1  ) 0
+      plot g  
+      set i i + 1
+    ]  
+end
+
 
 ;; stampa valori medi di parametri come il roe_stimato degli agenti, il flusso cumulato, etc.. e altri valori utili in fase di debug
 to print_simulation_info
@@ -2028,40 +2307,40 @@ to print_simulation_info
   let avg_costo_impianto 0
   let avg_ifin 0 ;; valore poco indicativo: nella media sommo anche i valori nulli relativi a chi non ha richiesto l'incentivo regionale
   
-  output-print ( word "***************************************************DATI ROE STIMATO*****************************************") 
-  while [i <= 4]
-    [
-      set avg_roe_stimato precision ( (sum [roe_stimato] of pf with  [anno_realizzazione = 2012 + i ] ) / (NAgentiFINAL * 2 ) ) 3
-      set avg_stima_ric_incentivo precision ( (sum [stima_ric_incentivo] of pf with  [anno_realizzazione = 2012 + i ] ) / (NAgentiFINAL * 2 ) ) 3
-      set avg_stima_ric_autoconsumo precision ( (sum [stima_ric_autoconsumo] of pf with  [anno_realizzazione = 2012 + i ] ) / (NAgentiFINAL * 2 ) ) 3
-      set avg_stima_ric_vendita precision ( (sum [stima_ric_vendita] of pf with  [anno_realizzazione = 2012 + i ] ) / (NAgentiFINAL * 2 ) ) 3
-      set avg_stima_van precision ( (sum [stima_van] of pf with  [anno_realizzazione = 2012 + i ] ) / (NAgentiFINAL * 2 ) ) 3
-      set avg_stima_kw_immessi precision ( (sum [stima_kw_immessi] of pf with  [anno_realizzazione = 2012 + i ] ) / (NAgentiFINAL * 2 ) ) 3
-      set avg_stima_kw_prelevati precision ( (sum [stima_kw_prelevati] of pf with  [anno_realizzazione = 2012 + i ] ) / (NAgentiFINAL * 2 ) ) 3
-      set avg_stima_kw_autoconsumo precision ( (sum [stima_kw_autoconsumo] of pf with  [anno_realizzazione = 2012 + i ] ) / (NAgentiFINAL * 2 ) ) 3
-      set avg_stima_flusso_cassa_cumulato precision ( (sum [stima_flusso_cassa_cumulato] of pf with  [anno_realizzazione = 2012 + i ] ) / (NAgentiFINAL * 2 ) ) 3
-      set avg_stima_consumo_medio_annuale precision ( (sum [stima_consumo_medio_annuale] of pf with  [anno_realizzazione = 2012 + i ] ) / (NAgentiFINAL * 2 ) ) 3
-      set avg_stima_kw_annui_impianto precision ( (sum [stima_kw_annui_impianto] of pf with  [anno_realizzazione = 2012 + i ] ) / (NAgentiFINAL * 2 ) ) 3
-      set avg_costo_impianto precision ( (sum [costo_impianto] of pf with  [anno_realizzazione = 2012 + i ] ) / (NAgentiFINAL * 2 ) ) 3
-      set avg_ifin precision ( (sum [ifin] of pf with  [anno_realizzazione = 2012 + i ] ) / (NAgentiFINAL * 2 ) ) 3
-      set cry 2012 + i 
-      set i i + 1
-      output-print ( word "-------- " cry "---------") 
-      output-print ( word "avg_roe_stimato:  " avg_roe_stimato "%" )
-      output-print ( word "avg_stima_flusso_cassa_cumulato:  " avg_stima_flusso_cassa_cumulato )
-      output-print ( word "avg_costo_impianto:  " avg_costo_impianto )
-      output-print ( word "avg_ifin (sottostimato):  " avg_ifin )
-      output-print ( word "avg_stima_ric_incentivo:  " avg_stima_ric_incentivo )
-      output-print ( word "avg_stima_ric_autoconsumo:  " avg_stima_ric_autoconsumo )
-      output-print ( word "avg_stima_ric_vendita:  " avg_stima_ric_vendita )
-      output-print ( word "avg_stima_van:  " avg_stima_van )
-      output-print ( word "avg_stima_kw_immessi:  " avg_stima_kw_immessi )
-      output-print ( word "avg_stima_kw_prelevati:  " avg_stima_kw_prelevati )
-      output-print ( word "avg_stima_kw_autoconsumo:  " avg_stima_kw_autoconsumo )
-      output-print ( word "avg_stima_consumo_medio_annuale:  " avg_stima_consumo_medio_annuale )
-      output-print ( word "avg_stima_kw_annui_impianto:  " avg_stima_kw_annui_impianto )
-      
-    ]  
+;  output-print ( word "***************************************************DATI ROE STIMATO*****************************************") 
+;  while [i <= 4]
+;    [
+;      set avg_roe_stimato precision ( (sum [roe_stimato] of pf with  [anno_realizzazione = 2012 + i ] ) / (NAgentiFINAL * 2 ) ) 3
+;      set avg_stima_ric_incentivo precision ( (sum [stima_ric_incentivo] of pf with  [anno_realizzazione = 2012 + i ] ) / (NAgentiFINAL * 2 ) ) 3
+;      set avg_stima_ric_autoconsumo precision ( (sum [stima_ric_autoconsumo] of pf with  [anno_realizzazione = 2012 + i ] ) / (NAgentiFINAL * 2 ) ) 3
+;      set avg_stima_ric_vendita precision ( (sum [stima_ric_vendita] of pf with  [anno_realizzazione = 2012 + i ] ) / (NAgentiFINAL * 2 ) ) 3
+;      set avg_stima_van precision ( (sum [stima_van] of pf with  [anno_realizzazione = 2012 + i ] ) / (NAgentiFINAL * 2 ) ) 3
+;      set avg_stima_kw_immessi precision ( (sum [stima_kw_immessi] of pf with  [anno_realizzazione = 2012 + i ] ) / (NAgentiFINAL * 2 ) ) 3
+;      set avg_stima_kw_prelevati precision ( (sum [stima_kw_prelevati] of pf with  [anno_realizzazione = 2012 + i ] ) / (NAgentiFINAL * 2 ) ) 3
+;      set avg_stima_kw_autoconsumo precision ( (sum [stima_kw_autoconsumo] of pf with  [anno_realizzazione = 2012 + i ] ) / (NAgentiFINAL * 2 ) ) 3
+;      set avg_stima_flusso_cassa_cumulato precision ( (sum [stima_flusso_cassa_cumulato] of pf with  [anno_realizzazione = 2012 + i ] ) / (NAgentiFINAL * 2 ) ) 3
+;      set avg_stima_consumo_medio_annuale precision ( (sum [stima_consumo_medio_annuale] of pf with  [anno_realizzazione = 2012 + i ] ) / (NAgentiFINAL * 2 ) ) 3
+;      set avg_stima_kw_annui_impianto precision ( (sum [stima_kw_annui_impianto] of pf with  [anno_realizzazione = 2012 + i ] ) / (NAgentiFINAL * 2 ) ) 3
+;      set avg_costo_impianto precision ( (sum [costo_impianto] of pf with  [anno_realizzazione = 2012 + i ] ) / (NAgentiFINAL * 2 ) ) 3
+;      set avg_ifin precision ( (sum [ifin] of pf with  [anno_realizzazione = 2012 + i ] ) / (NAgentiFINAL * 2 ) ) 3
+;      set cry 2012 + i 
+;      set i i + 1
+;      output-print ( word "-------- " cry "---------") 
+;      output-print ( word "avg_roe_stimato:  " avg_roe_stimato "%" )
+;      output-print ( word "avg_stima_flusso_cassa_cumulato:  " avg_stima_flusso_cassa_cumulato )
+;      output-print ( word "avg_costo_impianto:  " avg_costo_impianto )
+;      output-print ( word "avg_ifin (sottostimato):  " avg_ifin )
+;      output-print ( word "avg_stima_ric_incentivo:  " avg_stima_ric_incentivo )
+;      output-print ( word "avg_stima_ric_autoconsumo:  " avg_stima_ric_autoconsumo )
+;      output-print ( word "avg_stima_ric_vendita:  " avg_stima_ric_vendita )
+;      output-print ( word "avg_stima_van:  " avg_stima_van )
+;      output-print ( word "avg_stima_kw_immessi:  " avg_stima_kw_immessi )
+;      output-print ( word "avg_stima_kw_prelevati:  " avg_stima_kw_prelevati )
+;      output-print ( word "avg_stima_kw_autoconsumo:  " avg_stima_kw_autoconsumo )
+;      output-print ( word "avg_stima_consumo_medio_annuale:  " avg_stima_consumo_medio_annuale )
+;      output-print ( word "avg_stima_kw_annui_impianto:  " avg_stima_kw_annui_impianto )
+;      
+;    ]  
 end
 
 
@@ -2069,71 +2348,79 @@ end
 to aggiorna_incentivi_prod
   ask pf 
   [
-    ifelse (anno_realizzazione = 2012)
-    [
-      foreach ricavi_incentivi
+    
+  ifelse anno_realizzazione = 2007 [ foreach ricavi_incentivi
+      [
+        set INCENTIVO_PRO2007 ROUND (INCENTIVO_PRO2007 + ?)
+      ] ][
+  ifelse anno_realizzazione = 2008 [ foreach ricavi_incentivi
+      [
+        set INCENTIVO_PRO2008 ROUND (INCENTIVO_PRO2008 + ?)
+      ] ][
+  ifelse anno_realizzazione = 2009 [ foreach ricavi_incentivi
+      [
+        set INCENTIVO_PRO2009 ROUND (INCENTIVO_PRO2009 + ?)
+      ] ][
+  ifelse anno_realizzazione = 2010 [ foreach ricavi_incentivi
+      [
+        set INCENTIVO_PRO2010 ROUND (INCENTIVO_PRO2010 + ?)
+      ] ][
+  ifelse anno_realizzazione = 2011 [ foreach ricavi_incentivi
+      [
+        set INCENTIVO_PRO2011 ROUND (INCENTIVO_PRO2011 + ?)
+      ] ][
+  ifelse anno_realizzazione = 2012 [ foreach ricavi_incentivi
       [
         set INCENTIVO_PRO2012 ROUND (INCENTIVO_PRO2012 + ?)
-      ]
-    ]
-    [
-      ifelse (anno_realizzazione = 2013)
-      [
-        foreach ricavi_incentivi
+      ] ][
+  ifelse anno_realizzazione = 2013 [ foreach ricavi_incentivi
         [
           set INCENTIVO_PRO2013 ROUND (INCENTIVO_PRO2013 + ?)
         ]
         foreach ricavi_vendita
         [
           set INCENTIVO_PRO2013 ROUND (INCENTIVO_PRO2013 + ?)
-        ]
-      ]
-      [
-        ifelse (anno_realizzazione = 2014)
-        [
-          foreach ricavi_incentivi
+        ] ][
+  ifelse anno_realizzazione = 2014 [ foreach ricavi_incentivi
           [
             set INCENTIVO_PRO2014 ROUND (INCENTIVO_PRO2014 + ?)
           ]
           foreach ricavi_vendita
           [
             set INCENTIVO_PRO2014 ROUND (INCENTIVO_PRO2014 + ?)
-          ]
-        ]
-        
-        [
-          ifelse (anno_realizzazione = 2015)
-          [
-            foreach ricavi_incentivi
+          ] ][
+  ifelse anno_realizzazione = 2015 [ foreach ricavi_incentivi
             [
               set INCENTIVO_PRO2015 ROUND (INCENTIVO_PRO2015 + ?)
             ]
             foreach ricavi_vendita
             [
               set INCENTIVO_PRO2015 ROUND (INCENTIVO_PRO2015 + ?)
-            ]
-          ]
-          
-          [
-            foreach ricavi_incentivi
+            ] ][
+  ifelse anno_realizzazione = 2016 [ foreach ricavi_incentivi
             [
               set INCENTIVO_PRO2016 ROUND (INCENTIVO_PRO2016 + ?)
             ]
             foreach ricavi_vendita
             [
               set INCENTIVO_PRO2016 ROUND (INCENTIVO_PRO2016 + ?)
-            ]
-          ]
-        ]
-      ]
-    ]
+            ] ][
+    ;; default
+  ]]]]]]]]]]
+      
   ]
+  
 end
 
 ;; AGGIORNA SPESA TOTALE INCENTIVI + INSTALLAZIONE
 to aggiorna_incentivi_tot
-  set INCENTIVO_PROTOT ROUND (INCENTIVO_PRO2012 + INCENTIVO_PRO2013 + INCENTIVO_PRO2014 + INCENTIVO_PRO2015 + INCENTIVO_PRO2016)
+  set INCENTIVO_PROTOT ROUND (INCENTIVO_PRO2007 + INCENTIVO_PRO2008 + INCENTIVO_PRO2009 + INCENTIVO_PRO2010 + INCENTIVO_PRO2011 + INCENTIVO_PRO2012 + INCENTIVO_PRO2013 + INCENTIVO_PRO2014 + INCENTIVO_PRO2015 + INCENTIVO_PRO2016)
   set TOT_SPESA ROUND (INCENTIVO_PROTOT + INCENTIVO_INSTOT)
+  set TOT_SPESA2007 (INCENTIVO_PRO2007 + INCENTIVO_INST2007)
+  set TOT_SPESA2008 (INCENTIVO_PRO2008 + INCENTIVO_INST2008)
+  set TOT_SPESA2009 (INCENTIVO_PRO2009 + INCENTIVO_INST2009)
+  set TOT_SPESA2010 (INCENTIVO_PRO2010 + INCENTIVO_INST2010)
+  set TOT_SPESA2011 (INCENTIVO_PRO2011 + INCENTIVO_INST2011)
   set TOT_SPESA2012 (INCENTIVO_PRO2012 + INCENTIVO_INST2012)
   set TOT_SPESA2013 (INCENTIVO_PRO2013 + INCENTIVO_INST2013)
   set TOT_SPESA2014 (INCENTIVO_PRO2014 + INCENTIVO_INST2014)
@@ -2145,7 +2432,12 @@ end
 to stampa_resoconto
   output-print      ("****************************************************************************************************")
   output-print (word    "**************************************RESOCONTO IMPIANTI*****************************************")
-  output-print ( word   "IMPIANTI REALAZZATI NEL 2012 "  count_pf2012 " RAPPORTO 2012 "  r2012 "%")
+  output-print ( word   "IMPIANTI REALIZZATI NEL 2007 "  count_pf2007 " RAPPORTO 2007 "  r2007 "%")
+  output-print ( word   "IMPIANTI REALIZZATI NEL 2008 "  count_pf2008 " RAPPORTO 2008 "  r2008 "%")
+  output-print ( word   "IMPIANTI REALIZZATI NEL 2009 "  count_pf2009 " RAPPORTO 2009 "  r2009 "%")
+  output-print ( word   "IMPIANTI REALIZZATI NEL 2010 "  count_pf2010 " RAPPORTO 2010 "  r2010 "%")
+  output-print ( word   "IMPIANTI REALIZZATI NEL 2011 "  count_pf2011 " RAPPORTO 2011 "  r2011 "%")
+  output-print ( word   "IMPIANTI REALIZZATI NEL 2012 "  count_pf2012 " RAPPORTO 2012 "  r2012 "%")
   output-print (word    "IMPIANTI REALIZZATI NEL 2013 " count_pf2013 " RAPPORTO 2013 " r2013 "%")
   output-print (word    "IMPIANTI REALIZZATI NEL 2014 " count_pf2014 " RAPPORTO 2014 " r2014 "%")
   output-print (word    "IMPIANTI REALIZZATI NEL 2015 " count_pf2015 " RAPPORTO 2015 " r2015 "%")  
@@ -2153,14 +2445,24 @@ to stampa_resoconto
   output-print      ("****************************************************************************************************")
   output-print      ("****************************************************************************************************")
   output-print (word "************************************RESOCONTO POTENZA INSTALLATA************************************")
+  output-print (word "ANNO 2007: " kW2007 " KwP")
+  output-print (word "ANNO 2008: " kW2008 " KwP")
+  output-print (word "ANNO 2009: " kW2009 " KwP")
+  output-print (word "ANNO 2010: " kW2010 " KwP")
+  output-print (word "ANNO 2011: " kW2011 " KwP")
   output-print (word "ANNO 2012: " kW2012 " KwP")
   output-print (word "ANNO 2013: " kW2013 " KwP")
   output-print (word "ANNO 2014: " kW2014 " KwP")
   output-print (word "ANNO 2015: " kW2015 " KwP")
   output-print (word "ANNO 2016: " kW2016 " KwP")
-  output-print (word "TOTALE [2012..2016]: " kWTOT " KwP")
+  output-print (word "TOTALE [2007..2016]: " kWTOT " KwP")
   output-print      ("****************************************************************************************************")
   output-print (word "************************************RESOCONTO INCENTIVI ALLA PRODUZIONE*****************************")
+  output-print (word "ANNO 2007: " INCENTIVO_PRO2007 " euro")
+  output-print (word "ANNO 2008: " INCENTIVO_PRO2008 " euro")
+  output-print (word "ANNO 2009: " INCENTIVO_PRO2009 " euro")
+  output-print (word "ANNO 2010: " INCENTIVO_PRO2010 " euro")
+  output-print (word "ANNO 2011: " INCENTIVO_PRO2011 " euro")
   output-print (word "ANNO 2012: " INCENTIVO_PRO2012 " euro")
   output-print (word "ANNO 2013: " INCENTIVO_PRO2013 " euro")
   output-print (word "ANNO 2014: " INCENTIVO_PRO2014 " euro")
@@ -2169,6 +2471,11 @@ to stampa_resoconto
   output-print (word "TOTALE [2012..2016]: " INCENTIVO_PROTOT " euro")
   output-print      ("****************************************************************************************************")
   output-print (word "************************************RESOCONTO INCENTIVI INSTALLAZIONE*******************************")
+  output-print (word "ANNO 2007: " INCENTIVO_INST2007 " euro")
+  output-print (word "ANNO 2008: " INCENTIVO_INST2008 " euro")
+  output-print (word "ANNO 2009: " INCENTIVO_INST2009 " euro")
+  output-print (word "ANNO 2010: " INCENTIVO_INST2010 " euro")
+  output-print (word "ANNO 2011: " INCENTIVO_INST2011 " euro")
   output-print (word "ANNO 2012: " INCENTIVO_INST2012 " euro")
   output-print (word "ANNO 2013: " INCENTIVO_INST2013 " euro")
   output-print (word "ANNO 2014: " INCENTIVO_INST2014 " euro")
@@ -2177,6 +2484,11 @@ to stampa_resoconto
   output-print (word "TOTALE [2012..2016]: " INCENTIVO_INSTOT " euro")
   output-print   ("")
   output-print (word "************************************RESOCONTO TOTALE SPESA******************************************")
+  output-print (word "ANNO 2007: " TOT_SPESA2007  " euro")
+  output-print (word "ANNO 2008: " TOT_SPESA2008  " euro")
+  output-print (word "ANNO 2009: " TOT_SPESA2009  " euro")
+  output-print (word "ANNO 2010: " TOT_SPESA2010  " euro")
+  output-print (word "ANNO 2011: " TOT_SPESA2011  " euro")
   output-print (word "ANNO 2012: " TOT_SPESA2012  " euro")
   output-print (word "ANNO 2013: " TOT_SPESA2013  " euro")
   output-print (word "ANNO 2014: " TOT_SPESA2014  " euro")
@@ -2184,6 +2496,11 @@ to stampa_resoconto
   output-print (word "ANNO 2016: " TOT_SPESA2016  " euro")
   output-print (word "TOTALE [2012..2016]: " TOT_SPESA " euro")
   output-print (word "************************************RESOCONTO BUDGET ANNUALE******************************************")
+  output-print (word "ANNO 2007: " Budget2007  " euro")
+  output-print (word "ANNO 2008: " Budget2008  " euro")
+  output-print (word "ANNO 2009: " Budget2009  " euro")
+  output-print (word "ANNO 2010: " Budget2010  " euro")
+  output-print (word "ANNO 2011: " Budget2011  " euro")
   output-print (word "ANNO 2012: " Budget2012  " euro")
   output-print (word "ANNO 2013: " Budget2013  " euro")
   output-print (word "ANNO 2014: " Budget2014  " euro")
@@ -2379,7 +2696,7 @@ Media%_copertura_consumi_richiesta
 Media%_copertura_consumi_richiesta
 0
 100
-92
+70
 1
 1
 %
@@ -2409,7 +2726,7 @@ Costo_Medio_kwP
 Costo_Medio_kwP
 3000
 5000
-1536
+4300
 50
 1
 euro
@@ -2554,7 +2871,7 @@ costo_kwh_fascia1
 costo_kwh_fascia1
 0.250
 0.299
-0.45
+0.278
 0.001
 1
 euro\KWh
@@ -2569,7 +2886,7 @@ costo_kwh_fascia2
 costo_kwh_fascia2
 0.140
 0.189
-0.261
+0.162
 0.001
 1
 euro\KWh
@@ -2584,7 +2901,7 @@ costo_kwh_fascia3
 costo_kwh_fascia3
 0.170
 0.219
-0.314
+0.194
 0.001
 1
 euro\KWh
@@ -2599,7 +2916,7 @@ costo_kwh_fascia4
 costo_kwh_fascia4
 0.220
 0.269
-0.399
+0.246
 0.001
 1
 euro\KWh
@@ -2614,7 +2931,7 @@ costo_kwh_fascia5
 costo_kwh_fascia5
 0.250
 0.299
-0.446
+0.276
 0.001
 1
 euro\KWh
@@ -2731,7 +3048,7 @@ NumeroAgenti
 NumeroAgenti
 1
 100
-30
+50
 1
 1
 NIL
@@ -2753,10 +3070,10 @@ Tasso_lordo_rendimento_BOT
 HORIZONTAL
 
 OUTPUT
-1562
-443
-2228
-818
+2039
+401
+2705
+776
 9
 
 PLOT
@@ -2788,17 +3105,17 @@ PENS
 "Van9" 0.1 1 -2674135 true "" ""
 
 PLOT
-1099
-443
-1551
-704
+2054
+44
+2629
+372
 Average_ROE
 anni
 Roe
-2012.0
+2007.0
 2017.0
 0.0
-10.0
+25.0
 true
 true
 "" ""
@@ -2808,6 +3125,11 @@ PENS
 "2014" 1.0 1 -16777216 true "" ""
 "2015" 1.0 1 -13345367 true "" ""
 "2016" 1.0 1 -2674135 true "" ""
+"2007" 1.0 1 -7500403 true "" ""
+"2008" 1.0 1 -955883 true "" ""
+"2009" 1.0 1 -1184463 true "" ""
+"2010" 1.0 1 -13840069 true "" ""
+"2011" 1.0 1 -14835848 true "" ""
 
 TEXTBOX
 851
@@ -2820,10 +3142,10 @@ Attualizzazione
 1
 
 MONITOR
-1377
-107
-1506
-152
+1384
+386
+1513
+431
 kw INSTALLATI 2012
 kW2012
 17
@@ -2831,10 +3153,10 @@ kW2012
 11
 
 MONITOR
-1377
-325
-1506
-370
+1384
+604
+1513
+649
 kw INSTALLATI 2016
 kW2016
 17
@@ -2842,10 +3164,10 @@ kW2016
 11
 
 MONITOR
-1376
-384
-1508
-429
+1383
+663
+1515
+708
 kw INSTALLATI TOT
 kWTOT
 17
@@ -2853,10 +3175,10 @@ kWTOT
 11
 
 MONITOR
-1377
-157
-1505
-202
+1384
+436
+1512
+481
 kw INSTALLATI 2013
 kW2013\n
 17
@@ -2864,10 +3186,10 @@ kW2013\n
 11
 
 MONITOR
-1378
-213
-1506
-258
+1385
+492
+1513
+537
 kw INSTALLATI 2014
 kW2014
 17
@@ -2875,10 +3197,10 @@ kW2014
 11
 
 MONITOR
-1378
-271
-1506
-316
+1385
+550
+1513
+595
 kw INSTALLATI 2015
 kW2015
 17
@@ -2907,10 +3229,10 @@ CHOOSER
 9
 
 MONITOR
-1520
-214
-1716
-259
+1527
+493
+1723
+538
 INCENTIVI INSTALLAZIONE 2014
 INCENTIVO_INST2014
 2
@@ -2918,10 +3240,10 @@ INCENTIVO_INST2014
 11
 
 MONITOR
-1519
-107
-1715
-152
+1526
+386
+1722
+431
 INCENTIVI INSTALLAZIONE 2012
 INCENTIVO_INST2012
 2
@@ -2929,10 +3251,10 @@ INCENTIVO_INST2012
 11
 
 MONITOR
-1520
-160
-1716
-205
+1527
+439
+1723
+484
 INCENTIVI INSTALLAZIONE 2013
 INCENTIVO_INST2013
 2
@@ -2940,10 +3262,10 @@ INCENTIVO_INST2013
 11
 
 MONITOR
-1520
-271
-1716
-316
+1527
+550
+1723
+595
 INCENTIVI INSTALLAZIONE 2015
 INCENTIVO_INST2015
 2
@@ -2951,10 +3273,10 @@ INCENTIVO_INST2015
 11
 
 MONITOR
-1518
-327
-1714
-372
+1525
+606
+1721
+651
 INCENTIVI INSTALLAZIONE 2016
 INCENTIVO_INST2016
 2
@@ -2962,10 +3284,10 @@ INCENTIVO_INST2016
 11
 
 MONITOR
-1517
-381
-1716
-426
+1524
+660
+1723
+705
 INCENTIVI INSTALLAZIONE TOTALI
 INCENTIVO_INSTOT
 200
@@ -2973,10 +3295,10 @@ INCENTIVO_INSTOT
 11
 
 MONITOR
-1727
-105
-1869
-150
+1734
+384
+1876
+429
 INCENTIVI  2012
 INCENTIVO_PRO2012
 17
@@ -2984,10 +3306,10 @@ INCENTIVO_PRO2012
 11
 
 MONITOR
-1728
-162
-1871
-207
+1735
+441
+1878
+486
 INCENTIVI 2013
 INCENTIVO_PRO2013
 17
@@ -2995,10 +3317,10 @@ INCENTIVO_PRO2013
 11
 
 MONITOR
-1729
-216
-1869
-261
+1736
+495
+1876
+540
 INCENTIVI 2014
 INCENTIVO_PRO2014
 17
@@ -3006,10 +3328,10 @@ INCENTIVO_PRO2014
 11
 
 MONITOR
-1729
-274
-1868
-319
+1736
+553
+1875
+598
 INCENTIVI 2015
 INCENTIVO_PRO2015
 17
@@ -3017,10 +3339,10 @@ INCENTIVO_PRO2015
 11
 
 MONITOR
-1729
-326
-1870
-371
+1736
+605
+1877
+650
 INCENTIVI 2016
 INCENTIVO_PRO2016
 17
@@ -3028,10 +3350,10 @@ INCENTIVO_PRO2016
 11
 
 MONITOR
-1730
-384
-1872
-429
+1737
+663
+1879
+708
 INCENTIVI 
 INCENTIVO_PROTOT
 200
@@ -3039,10 +3361,10 @@ INCENTIVO_PROTOT
 11
 
 MONITOR
-1887
-106
-2013
-151
+1894
+385
+2020
+430
 TOTALE SPESA 2012
 TOT_SPESA2012
 17
@@ -3050,10 +3372,10 @@ TOT_SPESA2012
 11
 
 MONITOR
-1888
-161
-2013
-206
+1895
+440
+2020
+485
 TOTALE SPESA 2013
 TOT_SPESA2013
 17
@@ -3061,10 +3383,10 @@ TOT_SPESA2013
 11
 
 MONITOR
-1888
-217
-2013
-262
+1895
+496
+2020
+541
 TOTALE SPESA 2014
 TOT_SPESA2014
 17
@@ -3072,10 +3394,10 @@ TOT_SPESA2014
 11
 
 MONITOR
-1888
-271
-2012
-316
+1895
+550
+2019
+595
 TOTALE SPESA 2015
 TOT_SPESA2015
 17
@@ -3083,10 +3405,10 @@ TOT_SPESA2015
 11
 
 MONITOR
-1888
-330
-2016
-375
+1895
+609
+2023
+654
 TOTALE SPESA 2016
 TOT_SPESA2016
 17
@@ -3094,10 +3416,10 @@ TOT_SPESA2016
 11
 
 MONITOR
-1889
-382
-2015
-427
+1896
+661
+2022
+706
 SPESA TOTALE
 TOT_SPESA
 200
@@ -3123,7 +3445,7 @@ CHOOSER
 %_Variazione_Tariffe
 %_Variazione_Tariffe
 -30 -29 -28 -27 -26 -25 -24 -23 -22 -21 -20 -19 -18 -17 -16 -15 -14 -13 -12 -11 -10 -9 -8 -7 -6 -5 -4 -3 -2 -1 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30
-39
+30
 
 TEXTBOX
 646
@@ -3870,25 +4192,25 @@ percpositive
 11
 
 SLIDER
-1274
-943
-1532
-976
+1287
+1028
+1545
+1061
 BudgetRegione2013
 BudgetRegione2013
 0
 10
-0.1
+0
 0.1
 1
 milioni
 HORIZONTAL
 
 SLIDER
-1272
-989
-1530
-1022
+1285
+1074
+1543
+1107
 BudgetRegione2014
 BudgetRegione2014
 0
@@ -3900,10 +4222,10 @@ milioni
 HORIZONTAL
 
 SLIDER
-1274
-1039
-1532
-1072
+1287
+1124
+1545
+1157
 BudgetRegione2015
 BudgetRegione2015
 0
@@ -3915,10 +4237,10 @@ milioni
 HORIZONTAL
 
 SLIDER
-1274
-1084
-1532
-1117
+1287
+1169
+1545
+1202
 BudgetRegione2016
 BudgetRegione2016
 0
@@ -3930,28 +4252,28 @@ milioni
 HORIZONTAL
 
 PLOT
-1560
-842
-2041
-1127
+2154
+792
+2703
+1077
 kW_Installed
 Years
 kW
 0.0
-12.0
+16.0
 0.0
-600.0
+8000.0
 false
 false
 "" ""
 PENS
-"kW" 1.0 0 -13345367 true "" "plot kw_installed_yearly"
+"kW" 1.0 1 -13345367 true "" "plot kw_installed_yearly"
 
 SLIDER
-1274
-902
-1532
-935
+1287
+987
+1545
+1020
 BudgetRegione2012
 BudgetRegione2012
 0
@@ -3963,10 +4285,10 @@ milioni
 HORIZONTAL
 
 SLIDER
-1280
-748
-1534
-781
+1293
+833
+1547
+866
 BudgetRegione2008
 BudgetRegione2008
 0
@@ -3978,49 +4300,802 @@ milioni
 HORIZONTAL
 
 SLIDER
-1276
-789
+1289
+874
+1543
+907
+BudgetRegione2009
+BudgetRegione2009
+0
+10
+0
+0.1
+1
+milioni
+HORIZONTAL
+
+SLIDER
+1288
+912
+1542
+945
+BudgetRegione2010
+BudgetRegione2010
+0
+10
+0
+0.1
+1
+milioni
+HORIZONTAL
+
+SLIDER
+1287
+950
+1541
+983
+BudgetRegione2011
+BudgetRegione2011
+0
+10
+0
+0.1
+1
+milioni
+HORIZONTAL
+
+BUTTON
+1748
+725
+1821
+758
+NIL
+setup
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+BUTTON
+1844
+725
+1917
+758
+NIL
+go\n
+T
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+0
+
+MONITOR
+1385
+110
+1509
+155
+kw INSTALLATI 2007
+kW2007
+17
+1
+11
+
+MONITOR
+1385
+165
+1508
+210
+kw INSTALLATI 2008
+kW2008
+17
+1
+11
+
+MONITOR
+1385
+220
+1511
+265
+kw INSTALLATI 2009
+kW2009
+17
+1
+11
+
+MONITOR
+1385
+274
+1512
+319
+kw INSTALLATI 2010
+kW2010
+17
+1
+11
+
+MONITOR
+1385
+330
+1512
+375
+kw INSTALLATI 2011
+kW2011
+17
+1
+11
+
+MONITOR
+1517
+111
+1717
+156
+INCENTIVI INSTALLAZIONE 2007
+INCENTIVO_INST2007
+2
+1
+11
+
+MONITOR
+1517
+164
+1719
+209
+INCENTIVI INSTALLAZIONE 2008
+INCENTIVO_INST2008
+2
+1
+11
+
+MONITOR
+1520
+220
+1722
+265
+INCENTIVI INSTALLAZIONE 2009
+INCENTIVO_INST2009
+2
+1
+11
+
+MONITOR
+1522
+272
+1723
+317
+INCENTIVI INSTALLAZIONE 2010
+INCENTIVO_INST2010
+2
+1
+11
+
+MONITOR
+1525
+326
+1723
+371
+INCENTIVI INSTALLAZIONE 2011
+INCENTIVO_INST2011
+2
+1
+11
+
+MONITOR
+1727
+110
+1868
+155
+INCENTIVI  2007
+INCENTIVO_PRO2007
+17
+1
+11
+
+MONITOR
+1728
+163
+1871
+208
+INCENTIVI  2008
+INCENTIVO_PRO2008
+17
+1
+11
+
+MONITOR
+1731
+223
+1873
+268
+INCENTIVI  2009
+INCENTIVO_PRO2009
+17
+1
+11
+
+MONITOR
+1732
+274
+1874
+319
+INCENTIVI  2010
+INCENTIVO_PRO2010
+17
+1
+11
+
+MONITOR
+1732
+329
+1876
+374
+INCENTIVI  2011
+INCENTIVO_PRO2011
+17
+1
+11
+
+MONITOR
+1894
+328
+2019
+373
+TOTALE SPESA 2011
+TOT_SPESA2011
+17
+1
+11
+
+MONITOR
+1892
+275
+2018
+320
+TOTALE SPESA 2010
+TOT_SPESA2010
+17
+1
+11
+
+MONITOR
+1889
+223
+2018
+268
+TOTALE SPESA 2009
+TOT_SPESA2009
+17
+1
+11
+
+MONITOR
+1890
+166
+2016
+211
+TOTALE SPESA 2008
+TOT_SPESA2008
+17
+1
+11
+
+MONITOR
+1889
+111
+2016
+156
+TOTALE SPESA 2007
+TOT_SPESA2007
+17
+1
+11
+
+PLOT
+1560
+791
+2146
+1076
+kW_installed_bars
+NIL
+NIL
+2007.0
+2014.0
+0.0
+10000.0
+true
+false
+"" ""
+PENS
+"2007" 1.0 1 -11033397 true "" ""
+"2008" 1.0 1 -2674135 true "" ""
+"2009" 1.0 1 -955883 true "" ""
+"2010" 1.0 1 -6459832 true "" ""
+"2011" 1.0 1 -1184463 true "" ""
+"2012" 1.0 1 -10899396 true "" ""
+"2013" 1.0 1 -1664597 true "" ""
+
+MONITOR
+1654
+1089
+1767
+1134
+kW Secondo CE
+kW_2CE
+17
+1
+11
+
+MONITOR
+1655
+1141
+1767
+1186
+kW Terzo CE
+kW_3CE
+17
+1
+11
+
+MONITOR
+1656
+1193
+1768
+1238
+kW Quarto CE
+kW_4CE
+17
+1
+11
+
+MONITOR
+1655
+1242
+1768
+1287
+kW Quinto CE
+kW_5CE
+17
+1
+11
+
+MONITOR
+1774
+1090
+1924
+1135
+kW Secondo CE 2007
+kW_2CE_2007
+17
+1
+11
+
+MONITOR
+1934
+1090
+2084
+1135
+kW Secondo CE 2008
+kW_2CE_2008
+17
+1
+11
+
+MONITOR
+2091
+1091
+2241
+1136
+kW Secondo CE 2009
+kW_2CE_2009
+17
+1
+11
+
+MONITOR
+2249
+1092
+2399
+1137
+kW Secondo CE 2010
+kW_2CE_2010
+17
+1
+11
+
+MONITOR
+2409
+1093
+2559
+1138
+kW Secondo CE 2011
+kW_2CE_2011
+17
+1
+11
+
+MONITOR
+1776
+1141
+1924
+1186
+kW Terzo CE 2011
+kW_3CE_2011
+17
+1
+11
+
+MONITOR
+1777
+1194
+1924
+1239
+kW Quarto CE 2011
+kW_4CE_2011
+17
+1
+11
+
+MONITOR
+1933
+1193
+2084
+1238
+kW Quarto CE 2012
+kW_4CE_2012
+17
+1
+11
+
+MONITOR
+1775
+1243
+1923
+1288
+kW Quinto CE 2012
+kW_5CE_2012
+17
+1
+11
+
+MONITOR
+1932
+1244
+2085
+1289
+kW Quinto CE 2013
+kW_5CE_2013
+17
+1
+11
+
+MONITOR
+1656
+1300
+1768
+1345
+NIL
+kW_1FP
+17
+1
+11
+
+MONITOR
+1776
+1301
+1923
+1346
+NIL
+kW_2FP
+17
+1
+11
+
+MONITOR
+1934
+1301
+2083
+1346
+NIL
+kW_3FP
+17
+1
+11
+
+MONITOR
+1655
+1354
+1768
+1399
+NIL
+kW_4FP
+17
+1
+11
+
+MONITOR
+1777
+1353
+1923
+1398
+NIL
+kW_5FP
+17
+1
+11
+
+MONITOR
+1933
+1354
+2084
+1399
+NIL
+kW_6FP
+17
+1
+11
+
+BUTTON
+1558
+1220
+1631
+1253
+NIL
+setup
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+BUTTON
+1563
+1268
+1626
+1301
+NIL
+go
+T
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+0
+
+MONITOR
+1655
+1413
+1769
+1458
+NIL
+count_pf_1FP
+17
+1
+11
+
+MONITOR
+1779
+1414
+1922
+1459
+NIL
+count_pf_2FP
+17
+1
+11
+
+MONITOR
+1932
+1415
+2081
+1460
+NIL
+count_pf_3FP
+17
+1
+11
+
+MONITOR
+1654
+1465
+1770
+1510
+NIL
+count_pf_4FP
+17
+1
+11
+
+MONITOR
+1779
+1466
+1922
+1511
+NIL
+count_pf_5FP
+17
+1
+11
+
+MONITOR
+1929
+1466
+2084
+1511
+NIL
+count_pf_6FP
+17
+1
+11
+
+PLOT
+2125
+1162
+2692
 1530
-822
-BudgetRegione2009
-BudgetRegione2009
-0
-10
-0
-0.1
-1
-milioni
-HORIZONTAL
+KW_istalled_power_class
+Years
+kW
+0.0
+16.0
+0.0
+10000.0
+false
+false
+"" ""
+PENS
+"fascia1" 1.0 1 -13791810 true "" "plot kW_1FP"
+"fascia2" 1.0 1 -955883 true "" "plot kW_2FP"
+"fascia3" 1.0 1 -2674135 true "" "plot kW_3FP"
+"fascia4" 1.0 1 -6459832 true "" "plot kW_4FP"
+"fascia5" 1.0 1 -13840069 true "" "plot kW_5FP"
+"fascia6" 1.0 1 -8630108 true "" "plot kW_6FP"
 
-SLIDER
-1275
-827
-1529
-860
-BudgetRegione2010
-BudgetRegione2010
-0
-10
-0
-0.1
+MONITOR
+1377
+1220
+1462
+1265
+NIL
+morti_FP_1
+17
 1
-milioni
-HORIZONTAL
+11
 
-SLIDER
+MONITOR
+1376
+1273
+1461
+1318
+NIL
+morti_FP_2
+17
+1
+11
+
+MONITOR
+1376
+1324
+1461
+1369
+NIL
+morti_FP_3
+17
+1
+11
+
+MONITOR
+1376
+1374
+1461
+1419
+NIL
+morti_FP_4
+17
+1
+11
+
+MONITOR
+1376
+1424
+1461
+1469
+NIL
+morti_FP_5
+17
+1
+11
+
+MONITOR
+1376
+1472
+1461
+1517
+NIL
+morti_FP_6
+17
+1
+11
+
+MONITOR
+1470
 1274
-865
-1528
-898
-BudgetRegione2011
-BudgetRegione2011
-0
-10
-0
-0.1
+1543
+1319
+NIL
+rand_FP2
+17
 1
-milioni
-HORIZONTAL
+11
+
+MONITOR
+1470
+1222
+1543
+1267
+NIL
+rand_FP1
+17
+1
+11
+
+MONITOR
+1468
+1326
+1541
+1371
+NIL
+rand_FP3
+17
+1
+11
+
+MONITOR
+1468
+1377
+1541
+1422
+NIL
+rand_FP4
+17
+1
+11
+
+MONITOR
+1467
+1424
+1540
+1469
+NIL
+rand_FP5
+17
+1
+11
+
+MONITOR
+1468
+1471
+1541
+1516
+NIL
+rand_FP6
+17
+1
+11
 
 @#$#@#$#@
 ## CREDITS AND REFERENCES

@@ -80,6 +80,7 @@ globals [ wacc m2Kwp  count_tick scala_dim_impianto time anno number durata_impi
   sum_roe_morti_2014 sum_roe_morti_2015 sum_roe_morti_2016
   sum_roe_stimato_morti_2007 sum_roe_stimato_morti_2008 sum_roe_stimato_morti_2009 sum_roe_stimato_morti_2010 sum_roe_stimato_morti_2011 sum_roe_stimato_morti_2012 sum_roe_stimato_morti_2013
   sum_roe_stimato_morti_2014 sum_roe_stimato_morti_2015 sum_roe_stimato_morti_2016
+  sum_roe_stimato_morti_CE_2 sum_roe_stimato_morti_CE_3 sum_roe_stimato_morti_CE_4 sum_roe_stimato_morti_CE_5
 ]
 
 ;; DEFINIZIONE AGENTI E ATTRIBUTI AGENTI
@@ -128,6 +129,12 @@ pf-own [id consumo_medio_annuale budget %cop_cosumi M2disposizione dimensione_im
   flag_roe ;variabile per tenere traccia degli agenti che non installano a causa di roe insufficiente e non per problemi di eccedenza costi, etc.
   flag_sum_roe_morti
   flag_sum_roe_stimato_morti
+  
+  ;; ogni agente - in particolare modo i singoli cittadini - oltre a decidere se installare o meno un pf in base a considerazioni di natura economica 
+  ;; (fattibilità impianto e roe stimato) o sociale (ostinazione personale interazione sociale) potrebbe essere influenzato nella sua decisione anche in maniera negativa, 
+  ;; come ad esempio difficoltà burocratica percepita, mancanza di informazioni, mancanza di volontà per affrontare spese e incombenze necessarie ad avviare il progetto 
+  ;; (reali o percepite)  ---> tutti questi fattori potrebbero influenzare in maniera negativa la scelta   
+  
 ]
  
 breed [ar] ;; ar-> agente unico che rappresenta la regione
@@ -466,13 +473,17 @@ to set_global
   set sum_roe_stimato_morti_2015 0
   set sum_roe_stimato_morti_2016 0
   
+  set sum_roe_stimato_morti_CE_2 0
+  set sum_roe_stimato_morti_CE_3 0
+  set sum_roe_stimato_morti_CE_4 0
+  set sum_roe_stimato_morti_CE_5 0
+  
   set kw_sum 0
   set kw_installed_semester 0
   
   set roe_minimo ROE_minimo_desiderato
   
   set NAgentiFINAL NumeroAgenti;quanti crearne per semestre
-  ;set NAgentiFINAL 200
   
   ifelse (Tecnologia_Pannello = "Monocristallini"  )
   [
@@ -930,7 +941,7 @@ to valuta_fattibilita_impianto
         aggiorna_incentivi_installazione
         aggiorna_budget_annuale
         aggiorna_pf
-        stampa
+        ;stampa
       ]
       [  ;; impianto non realizzato
         output-print   ("*************************************************************************************************")
@@ -1078,7 +1089,7 @@ to aggiorna_sum_roe_morti
   ]]]]]]]]]]
 end
 
-;; tiene traccia del roe stimato degli agenti che sono morti durante l'esecuzione, per poter calcolare correttamente il roe medio finale
+;; tiene traccia del roe stimato degli agenti che sono morti durante l'esecuzione, per poter calcolare correttamente il roe stimato medio finale
 to aggiorna_sum_roe_stimato_morti
   ifelse anno = 2007 [ set sum_roe_stimato_morti_2007 sum_roe_stimato_morti_2007 + roe_stimato ][
   ifelse anno = 2008 [ set sum_roe_stimato_morti_2008 sum_roe_stimato_morti_2008 + roe_stimato ][
@@ -1091,6 +1102,13 @@ to aggiorna_sum_roe_stimato_morti
   ifelse anno = 2015 [ set sum_roe_stimato_morti_2015 sum_roe_stimato_morti_2015 + roe_stimato ][
   ifelse anno = 2016 [ set sum_roe_stimato_morti_2016 sum_roe_stimato_morti_2016 + roe_stimato ][
   ]]]]]]]]]]
+  
+  ifelse conto_energia = 2 [ set sum_roe_stimato_morti_CE_2 sum_roe_stimato_morti_CE_2 + roe_stimato ][
+  ifelse conto_energia = 3 [ set sum_roe_stimato_morti_CE_3 sum_roe_stimato_morti_CE_3 + roe_stimato ][
+  ifelse conto_energia = 4 [ set sum_roe_stimato_morti_CE_4 sum_roe_stimato_morti_CE_4 + roe_stimato ][
+  ifelse conto_energia = 5 [ set sum_roe_stimato_morti_CE_5 sum_roe_stimato_morti_CE_5 + roe_stimato ][
+  ]]]]
+  
 end
 
 ;; VALUTAZIONE AUMENTO DIMENSIONI E POTENZA IMPIANTO IN BASE A OSTINAZIONE
@@ -1132,7 +1150,7 @@ to accetta_ridimensionamento
         aggiorna_incentivi_installazione
         aggiorna_budget_annuale
         aggiorna_pf
-        stampa
+        ;stampa
       ]
       [  ;; impianto non realizzato
         output-print   ("*************************************************************************************************")
@@ -1197,7 +1215,7 @@ to accetta_prestito
         aggiorna_incentivi_installazione
         aggiorna_budget_annuale
         aggiorna_pf
-        stampa
+        ;stampa
       ]
       [  ;; impianto non realizzato
         output-print   ("*************************************************************************************************")
@@ -2438,6 +2456,7 @@ to stima_roe
     [ ;; ricavi impianti con CE 5
       set stima_ric_incentivo precision ( stima_kw_autoconsumo * tariffa_autoconsumo ) 2
       set stima_ric_vendita precision ( stima_kw_immessi * tariffa_omnicomprensiva ) 2
+      
     ]
     
     
@@ -2485,6 +2504,7 @@ end
 
 ;; CALCOLO INDICI ROE E ROI
 to calcola_roi_roe
+  ;; TODO -----> cosa è corretto usare (costo_impianto - ifin + intRegione) oppure (costo_impianto + intRegione)? 
  ; (costo_impianto - ifin + intRegione)  
  
  ;; Croce utilizza nel calcolo di roi e roeil flusso cassa cumulato NON attualizzato
@@ -2494,7 +2514,7 @@ to calcola_roi_roe
 
   ;; versione per il calcolo di roi e roe con il flusso di cassa cumulato e attualizzato
   set roi% precision ((((flusso_cassa_attualizzato_cumulato - ((costo_impianto - ifin + intRegione) - importo_prestito ))  / ( costo_impianto - ifin + intRegione + 0.01 ) ) * 100 ) / durata_impianti )  3
-  set roe% precision ((((flusso_cassa_attualizzato_cumulato - ((costo_impianto + intRegione) - importo_prestito )) / ( (costo_impianto + intRegione + 0.01 ) - importo_prestito) ) * 100 ) / durata_impianti ) 3
+  set roe% precision ((((flusso_cassa_attualizzato_cumulato - ((costo_impianto - ifin + intRegione) - importo_prestito )) / ( (costo_impianto - ifin + intRegione + 0.01 ) - importo_prestito) ) * 100 ) / durata_impianti ) 3
  ;; output-print  (word   "----->>>> AGENTE " id  " ANNO " anno_realizzazione " SEMESTRE " semestre_realizzazione " CE " conto_energia " roe: " roe%) 
 end
 
@@ -2551,6 +2571,9 @@ to update_plot_roe
       ifelse (2007 + i = 2012) [set count_agenti count_pf2012 + totneg_roe2012 ][ 
       ifelse (2007 + i = 2013) [set count_agenti count_pf2013 + totneg_roe2013 ][ 
       ]]]]]]]
+      ;; questa funzione non calcola correttamente il roe medio nel caso siano presenti molti agenti che falliscono a causa di un roe insufficiente, inoltre non vengono nemmeno
+      ;; considerati i roe degli agenti che falliscono a causa di eccedenze dimensioni/budget --> in genere fornisce comunque una buona approssimazione e in ogni caso i calcoli 
+      ;; corretti sono efettuati durante il calcolo del roe stimato medio
       set g precision ( (sum [roe%] of pf with  [anno_realizzazione = 2007 + i ]) / count_agenti ) 3
       set-current-plot "Average_ROE"
       set cry 2007 + i 
@@ -2681,12 +2704,19 @@ to print_simulation_info
     output-print ( word "***************************************************DATI ROE STIMATO : CONTO ENERGIA *****************************************") 
     while [i <= 3]
     [
-      ifelse (2 + i = 2) [set count_agenti NAgentiFINAL * 8.6 ][ ;; i semestri del 2007-2010 più il 60% circa degli agenti del primo semestre 2011
-      ifelse (2 + i = 3) [set count_agenti NAgentiFINAL * 0.4 ][ ;; il 40% circa degli agenti del primo semestre 2011
-      ifelse (2 + i = 4) [set count_agenti NAgentiFINAL * 2  ][ 
-      ifelse (2 + i = 5) [set count_agenti NAgentiFINAL * 3 ][
+      ;; il roe medio calcolato per conto energia è solamente un'approssimazione: il numero di agenti utilizzato al denominatore è una stima (abbastanza precisa) del numero di agenti
+      ;; che rientrano nei conti energia 
+      ifelse (2 + i = 2) [set count_agenti NAgentiFINAL * 8.6 ;; i semestri del 2007-2010 più il 60% circa degli agenti del primo semestre 2011
+         set sum_roe (sum [roe_stimato] of pf with [conto_energia = 2 + i ]) + sum_roe_stimato_morti_CE_2 ][ 
+      ifelse (2 + i = 3) [set count_agenti NAgentiFINAL * 0.4 
+         set sum_roe (sum [roe_stimato] of pf with [conto_energia = 2 + i ]) + sum_roe_stimato_morti_CE_3 ][ ;; il 40% circa degli agenti del primo semestre 2011
+      ifelse (2 + i = 4) [set count_agenti NAgentiFINAL * 2 
+         set sum_roe (sum [roe_stimato] of pf with [conto_energia = 2 + i ]) + sum_roe_stimato_morti_CE_4 ][ 
+      ifelse (2 + i = 5) [set count_agenti NAgentiFINAL * 3 
+         set sum_roe (sum [roe_stimato] of pf with [conto_energia = 2 + i ]) + sum_roe_stimato_morti_CE_5 ][
       ]]]]
-      set avg_roe_stimato precision ( (sum [roe_stimato] of pf with  [conto_energia = 2 + i ] ) / count_agenti ) 3
+      ;; set avg_roe_stimato precision ( (sum [roe_stimato] of pf with  [conto_energia = 2 + i ] ) / count_agenti ) 3
+      set avg_roe_stimato precision ( sum_roe / count_agenti ) 3
       set cry 2 + i 
       set i i + 1
       
@@ -3410,7 +3440,7 @@ SLIDER
 NumeroAgenti
 NumeroAgenti
 1
-100
+250
 50
 1
 1
@@ -3900,7 +3930,7 @@ CHOOSER
 fr
 fr
 "Nessuno" "Asta" "Conto interessi" "Rotazione" "Garanzia"
-0
+1
 
 SLIDER
 17
@@ -3911,7 +3941,7 @@ BudgetRegione
 BudgetRegione
 0.1
 15
-5
+0.1
 0.1
 1
 milioni
@@ -4686,7 +4716,7 @@ BudgetRegione2010
 BudgetRegione2010
 0
 10
-0
+2
 0.1
 1
 milioni
@@ -4701,7 +4731,7 @@ BudgetRegione2011
 BudgetRegione2011
 0
 10
-0
+2
 0.1
 1
 milioni
@@ -6122,11 +6152,11 @@ NetLogo 5.0.2
 @#$#@#$#@
 @#$#@#$#@
 <experiments>
-  <experiment name="kW_installed_yearly_CE" repetitions="500" runMetricsEveryStep="false">
+  <experiment name="kW_installed_yearly_CE" repetitions="1000" runMetricsEveryStep="false">
     <setup>setup</setup>
     <go>go</go>
     <enumeratedValueSet variable="NumeroAgenti">
-      <value value="100"/>
+      <value value="200"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="Tasso_lordo_rendimento_BOT">
       <value value="2.147"/>
@@ -6195,7 +6225,7 @@ NetLogo 5.0.2
       <value value="2"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="Raggio">
-      <value value="5"/>
+      <value value="10"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="InterBanca">
       <value value="5"/>

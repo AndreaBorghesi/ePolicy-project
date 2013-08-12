@@ -37,6 +37,9 @@ globals [ wacc m2Kwp  count_tick scala_dim_impianto time anno number durata_impi
   ;; sono i primi 3 presenti in lista, posizioni 0,1,2 - nella lista sono inoltre salvati in ordine opposto rispetto ai file da cui sono letti, ovvero in posizione 0 ci sono i 
   ;; prezzi minimi per gli impianti di dimensione maggiore (prezzi minori) e in pos.2 quelli per gli impianti più piccoli
   prezzi_minimi_gse ;; 
+  ;; ogni anno i prezzi dell'energia elettrica al consumatore finale cambiano --> lista di 5 elementi, un per ogni fascia di consumo individuata nella versione
+  ;; inziali di Croce - la gestione di questi costi è analoga a quella dei prezzi minimi garantiti dal gse
+  costo_kwh_consumo
   ;; variabili per tenere traccia del numero totale di kw istallati con i diversi Conti  Energia
   kW_2CE
   kW_3CE
@@ -61,8 +64,22 @@ globals [ wacc m2Kwp  count_tick scala_dim_impianto time anno number durata_impi
   count_pf_5CE
   ;; variabili per tenere traccia del numero totale di kw istallati divisi per fascia di potenza
   kW_1FP kW_2FP kW_3FP kW_4FP kW_5FP kW_6FP
+  ;; variabili per tenere traccia del numero totale di kw istallati divisi per fascia di potenza ogni anno
+  kW_1FP_2007 kW_1FP_2008 kW_1FP_2009 kW_1FP_2010 kW_1FP_2011 kW_1FP_2012 kW_1FP_2013
+  kW_2FP_2007 kW_2FP_2008 kW_2FP_2009 kW_2FP_2010 kW_2FP_2011 kW_2FP_2012 kW_2FP_2013
+  kW_3FP_2007 kW_3FP_2008 kW_3FP_2009 kW_3FP_2010 kW_3FP_2011 kW_3FP_2012 kW_3FP_2013
+  kW_4FP_2007 kW_4FP_2008 kW_4FP_2009 kW_4FP_2010 kW_4FP_2011 kW_4FP_2012 kW_4FP_2013
+  kW_5FP_2007 kW_5FP_2008 kW_5FP_2009 kW_5FP_2010 kW_5FP_2011 kW_5FP_2012 kW_5FP_2013
+  kW_6FP_2007 kW_6FP_2008 kW_6FP_2009 kW_6FP_2010 kW_6FP_2011 kW_6FP_2012 kW_6FP_2013
   ;; variabili per tenere traccia del numero totale di impianti PV istallati divisi per fascia di potenza
   count_pf_1FP count_pf_2FP count_pf_3FP count_pf_4FP count_pf_5FP count_pf_6FP
+  ;; variabili per tenere traccia del numero totale di impianti istallati divisi per fascia di potenza ogni anno
+  count_pf_1FP_2007 count_pf_1FP_2008 count_pf_1FP_2009 count_pf_1FP_2010 count_pf_1FP_2011 count_pf_1FP_2012 count_pf_1FP_2013
+  count_pf_2FP_2007 count_pf_2FP_2008 count_pf_2FP_2009 count_pf_2FP_2010 count_pf_2FP_2011 count_pf_2FP_2012 count_pf_2FP_2013
+  count_pf_3FP_2007 count_pf_3FP_2008 count_pf_3FP_2009 count_pf_3FP_2010 count_pf_3FP_2011 count_pf_3FP_2012 count_pf_3FP_2013
+  count_pf_4FP_2007 count_pf_4FP_2008 count_pf_4FP_2009 count_pf_4FP_2010 count_pf_4FP_2011 count_pf_4FP_2012 count_pf_4FP_2013
+  count_pf_5FP_2007 count_pf_5FP_2008 count_pf_5FP_2009 count_pf_5FP_2010 count_pf_5FP_2011 count_pf_5FP_2012 count_pf_5FP_2013
+  count_pf_6FP_2007 count_pf_6FP_2008 count_pf_6FP_2009 count_pf_6FP_2010 count_pf_6FP_2011 count_pf_6FP_2012 count_pf_6FP_2013
   ;; agenti che non istallano impianto, divisi per classe di potenza
   morti_FP_1 morti_FP_2 morti_FP_3 morti_FP_4 morti_FP_5 morti_FP_6
   ;; informazioni per testare il funzionamento di valori casuali
@@ -81,6 +98,7 @@ globals [ wacc m2Kwp  count_tick scala_dim_impianto time anno number durata_impi
   sum_roe_stimato_morti_2007 sum_roe_stimato_morti_2008 sum_roe_stimato_morti_2009 sum_roe_stimato_morti_2010 sum_roe_stimato_morti_2011 sum_roe_stimato_morti_2012 sum_roe_stimato_morti_2013
   sum_roe_stimato_morti_2014 sum_roe_stimato_morti_2015 sum_roe_stimato_morti_2016
   sum_roe_stimato_morti_CE_2 sum_roe_stimato_morti_CE_3 sum_roe_stimato_morti_CE_4 sum_roe_stimato_morti_CE_5
+  
 ]
 
 ;; DEFINIZIONE AGENTI E ATTRIBUTI AGENTI
@@ -134,6 +152,7 @@ pf-own [id consumo_medio_annuale budget %cop_cosumi M2disposizione dimensione_im
   ;; (fattibilità impianto e roe stimato) o sociale (ostinazione personale interazione sociale) potrebbe essere influenzato nella sua decisione anche in maniera negativa, 
   ;; come ad esempio difficoltà burocratica percepita, mancanza di informazioni, mancanza di volontà per affrontare spese e incombenze necessarie ad avviare il progetto 
   ;; (reali o percepite)  ---> tutti questi fattori potrebbero influenzare in maniera negativa la scelta   
+  resistenza_investimento
   
 ]
  
@@ -147,17 +166,19 @@ ar-own [
 to setup
   __clear-all-and-reset-ticks
   
-  ;; questi costi sono ancora quelli del simulatore originale, relativi al 2011 
-  set costo_kwh_fascia1 0.278
-  set costo_kwh_fascia2 0.162
-  set costo_kwh_fascia3 0.194
-  set costo_kwh_fascia4 0.246
-  set costo_kwh_fascia5 0.276
+  ;; questi costi sono ancora quelli del simulatore originale, relativi al 2011  - vecchi valori croce
+;  set costo_kwh_fascia1 0.278
+;  set costo_kwh_fascia2 0.162
+;  set costo_kwh_fascia3 0.194
+;  set costo_kwh_fascia4 0.246
+;  set costo_kwh_fascia5 0.276
+  set costo_kwh_consumo []
   set prezzi_minimi_gse []
   output-print (word "---------------------------------------------------------------------------------")
   output-print (word "-----------------------------------INIZIO SIMULAZIONE----------------------------")
   set_global
   calcola_prezzi_minimi_gse
+  calcola_prezzi_elettricita_consumatore
   output-print (word "NUMERO AGENTI PER SEMESTRE: "NAgentiFINAL)
   output-print (word "PREVISTA VARIAZIONE TARIFFE INCENTIVANTI SULLA PRODUZIONE: " Varia_Tariffe_Incetivanti )
   output-print (word "PREVISTI INCENTIVI INSTALLAZIONE: " Incentivi_Installazione )
@@ -240,11 +261,11 @@ to go
     aggiorna_incentivi_prod
     aggiorna_incentivi_tot
     ; stampa_agenti  ;; commentato per non appesantire output, usare in fase di debug
-    stampa_resoconto
+    ;;stampa_resoconto
     update_plot_roe
     update_plot_kw_bars
     
-    print_simulation_info
+    ;;print_simulation_info
     output-print (word "--------------------------------------------------------------------------------------------------------------------------------------------------------")
     output-print (word "---------------------------------------------------------------------FINE SIMULAZIONE-------------------------------------------------------------------")
     output-print (word "--------------------------------------------------------------------------------------------------------------------------------------------------------")
@@ -254,8 +275,9 @@ to go
     ;;write_pl_file
     
     ;; scrivo su file i risultati relativi ai kW installati ogni anno con i diversi Conti Energia
-    write_CE_file
-    
+    ;write_kW_CE_file
+    write_count_pf_CE_file
+        
    ;;resetta alcune variabili per non avere probemi con simulazioni successive
    reset_var
     
@@ -267,6 +289,7 @@ to go
     set anno anno + 1
     aggiorna_prezzi;tutto cambia di anno in anno
     calcola_prezzi_minimi_gse
+    calcola_prezzi_elettricita_consumatore
   ]
 end
 
@@ -277,12 +300,13 @@ to default
   ;; the beginning of your setup procedure and reset-ticks at the end
   ;; of the procedure.)
   __clear-all-and-reset-ticks
-  ;; Costi prezzi energia al Kwh (dati del 2011)
-  set costo_kwh_fascia1 0.278
-  set costo_kwh_fascia2 0.162
-  set costo_kwh_fascia3 0.194
-  set costo_kwh_fascia4 0.246
-  set costo_kwh_fascia5 0.276
+  ;; Costi prezzi energia al Kwh (dati del 2011) - vecchi valori croce
+;  set costo_kwh_fascia1 0.278
+;  set costo_kwh_fascia2 0.162
+;  set costo_kwh_fascia3 0.194
+;  set costo_kwh_fascia4 0.246
+;  set costo_kwh_fascia5 0.276
+  
   set Irradiazione_media_annua_kwh_kwp 1350 
   set Tecnologia_Pannello  "Monocristallini" 
   set Costo_Medio_kwP 4300 
@@ -384,11 +408,13 @@ end
 ;;SETUP DI VARIABILI CHE VENGONO MODIFICATE IN 'GO' MA DEVONO ESSERE RIPRISTINATE AI VALORI INIZIALI NEL CASO DI ESECUZIONI SUCCESSIVE
 ;; molto simile a default ma senza modificare la lettura da serie storica e random o il tipo di incentivo regionale
 to reset_var
-  set costo_kwh_fascia1 0.278
-  set costo_kwh_fascia2 0.162
-  set costo_kwh_fascia3 0.194
-  set costo_kwh_fascia4 0.246
-  set costo_kwh_fascia5 0.276
+  ;; vecchi valori della tesi Croce - 2011
+;  set costo_kwh_fascia1 0.278
+;  set costo_kwh_fascia2 0.162
+;  set costo_kwh_fascia3 0.194
+;  set costo_kwh_fascia4 0.246
+;  set costo_kwh_fascia5 0.276
+  
   set Irradiazione_media_annua_kwh_kwp 1350 
   set Tecnologia_Pannello  "Monocristallini" 
   set Costo_Medio_kwP 4300 
@@ -477,6 +503,92 @@ to set_global
   set sum_roe_stimato_morti_CE_3 0
   set sum_roe_stimato_morti_CE_4 0
   set sum_roe_stimato_morti_CE_5 0
+  
+  set kW_1FP_2007 0
+  set kW_1FP_2008 0
+  set kW_1FP_2009 0
+  set kW_1FP_2010 0
+  set kW_1FP_2011 0
+  set kW_1FP_2012 0
+  set kW_1FP_2013 0
+  set kW_2FP_2007 0
+  set kW_2FP_2008 0
+  set kW_2FP_2009 0
+  set kW_2FP_2010 0
+  set kW_2FP_2011 0
+  set kW_2FP_2012 0
+  set kW_2FP_2013 0
+  set kW_3FP_2007 0
+  set kW_3FP_2008 0
+  set kW_3FP_2009 0
+  set kW_3FP_2010 0
+  set kW_3FP_2011 0
+  set kW_3FP_2012 0
+  set kW_3FP_2013 0
+  set kW_4FP_2007 0
+  set kW_4FP_2008 0
+  set kW_4FP_2009 0
+  set kW_4FP_2010 0
+  set kW_4FP_2011 0
+  set kW_4FP_2012 0
+  set kW_4FP_2013 0
+  set kW_5FP_2007 0
+  set kW_5FP_2008 0
+  set kW_5FP_2009 0
+  set kW_5FP_2010 0
+  set kW_5FP_2011 0
+  set kW_5FP_2012 0
+  set kW_5FP_2013 0
+  set kW_6FP_2007 0
+  set kW_6FP_2008 0
+  set kW_6FP_2009 0
+  set kW_6FP_2010 0
+  set kW_6FP_2011 0
+  set kW_6FP_2012 0
+  set kW_6FP_2013 0
+  
+  set count_pf_1FP_2007 0
+  set count_pf_1FP_2008 0
+  set count_pf_1FP_2009 0
+  set count_pf_1FP_2010 0
+  set count_pf_1FP_2011 0
+  set count_pf_1FP_2012 0
+  set count_pf_1FP_2013 0
+  set count_pf_2FP_2007 0
+  set count_pf_2FP_2008 0
+  set count_pf_2FP_2009 0
+  set count_pf_2FP_2010 0
+  set count_pf_2FP_2011 0
+  set count_pf_2FP_2012 0
+  set count_pf_2FP_2013 0
+  set count_pf_3FP_2007 0
+  set count_pf_3FP_2008 0
+  set count_pf_3FP_2009 0
+  set count_pf_3FP_2010 0
+  set count_pf_3FP_2011 0
+  set count_pf_3FP_2012 0
+  set count_pf_3FP_2013 0
+  set count_pf_4FP_2007 0
+  set count_pf_4FP_2008 0
+  set count_pf_4FP_2009 0
+  set count_pf_4FP_2010 0
+  set count_pf_4FP_2011 0
+  set count_pf_4FP_2012 0
+  set count_pf_4FP_2013 0
+  set count_pf_5FP_2007 0
+  set count_pf_5FP_2008 0
+  set count_pf_5FP_2009 0
+  set count_pf_5FP_2010 0
+  set count_pf_5FP_2011 0
+  set count_pf_5FP_2012 0
+  set count_pf_5FP_2013 0
+  set count_pf_6FP_2007 0
+  set count_pf_6FP_2008 0
+  set count_pf_6FP_2009 0
+  set count_pf_6FP_2010 0
+  set count_pf_6FP_2011 0
+  set count_pf_6FP_2012 0
+  set count_pf_6FP_2013 0
   
   set kw_sum 0
   set kw_installed_semester 0
@@ -747,7 +859,7 @@ to genera_pf
   set prestito false;al momento
   set ridimensionamento false 
   set incentivo_installazione 0
-  ifelse (id = 0 or id = (NAgentiFINAL * count_tick ) );per tutti gli agenti zero, uno ogni semsestre  
+  ifelse (id = 0 or id = (NAgentiFINAL * count_tick ) );per tutti gli agenti zero, uno ogni semestre  
     ;;GENERAZIONE AGENTE ZERO
     [
       set %ostinazione  100;;parte da ostinazione massima
@@ -799,6 +911,7 @@ to genera_pf
         
       ]
     ]
+    
   set_conto_energia
   calcola_dimensione;dopo ho dimensione impianto i m2
   calcola_costi_impianto;dopo ho costo impianto in euro
@@ -936,12 +1049,12 @@ to valuta_fattibilita_impianto
       
       stima_roe
       ;; decisione presa anche sulla base del roe stimato: se è minore di quello minimo l'agente non realizza l'impianto
-      ifelse (roe_stimato > roe_minimo)[ ;; impianto realizzato
-        aggiorna_kW
-        aggiorna_incentivi_installazione
-        aggiorna_budget_annuale
-        aggiorna_pf
-        ;stampa
+      ifelse (roe_stimato > roe_minimo)[ ;; impianto realizzabile 
+          aggiorna_kW
+          aggiorna_incentivi_installazione
+          aggiorna_budget_annuale
+          aggiorna_pf
+          ;stampa
       ]
       [  ;; impianto non realizzato
         output-print   ("*************************************************************************************************")
@@ -1145,12 +1258,12 @@ to accetta_ridimensionamento
       ;; calcola_tariffa_gse vecchia versione senza CE
       stima_roe
       ;; decisione presa anche sulla base del roe stimato: se è minore di quello minimo l'agente non realizza l'impianto
-      ifelse (roe_stimato > roe_minimo)[ ;; impianto realizzato
-        aggiorna_kW
-        aggiorna_incentivi_installazione
-        aggiorna_budget_annuale
-        aggiorna_pf
-        ;stampa
+      ifelse (roe_stimato > roe_minimo)[ ;; impianto realizzabile
+          aggiorna_kW
+          aggiorna_incentivi_installazione
+          aggiorna_budget_annuale
+          aggiorna_pf
+          ;stampa
       ]
       [  ;; impianto non realizzato
         output-print   ("*************************************************************************************************")
@@ -1210,12 +1323,12 @@ to accetta_prestito
       calcola_tariffe_ce
       stima_roe
       ;; decisione presa anche sulla base del roe stimato: se è minore di quello minimo l'agente non realizza l'impianto
-      ifelse (roe_stimato > roe_minimo)[ ;; impianto realizzato
-        aggiorna_kW
-        aggiorna_incentivi_installazione
-        aggiorna_budget_annuale
-        aggiorna_pf
-        ;stampa
+      ifelse (roe_stimato > roe_minimo)[ ;; impianto realizzabile
+          aggiorna_kW
+          aggiorna_incentivi_installazione
+          aggiorna_budget_annuale
+          aggiorna_pf
+          ;stampa
       ]
       [  ;; impianto non realizzato
         output-print   ("*************************************************************************************************")
@@ -1415,6 +1528,51 @@ to aggiorna_kw_FP
     ;; default case
   ]]]]]]
   
+  ;; aggiornamento potenza impianti installati per FP ogni anno
+  ifelse (fascia_potenza = 1 and anno_realizzazione = 2007) [ set kW_1FP_2007 kW_1FP_2007 + potenza_impianto][
+  ifelse (fascia_potenza = 1 and anno_realizzazione = 2008) [ set kW_1FP_2008 kW_1FP_2008 + potenza_impianto][
+  ifelse (fascia_potenza = 1 and anno_realizzazione = 2009) [ set kW_1FP_2009 kW_1FP_2009 + potenza_impianto][
+  ifelse (fascia_potenza = 1 and anno_realizzazione = 2010) [ set kW_1FP_2010 kW_1FP_2010 + potenza_impianto][
+  ifelse (fascia_potenza = 1 and anno_realizzazione = 2011) [ set kW_1FP_2011 kW_1FP_2011 + potenza_impianto][
+  ifelse (fascia_potenza = 1 and anno_realizzazione = 2012) [ set kW_1FP_2012 kW_1FP_2012 + potenza_impianto][
+  ifelse (fascia_potenza = 1 and anno_realizzazione = 2013) [ set kW_1FP_2013 kW_1FP_2013 + potenza_impianto][
+  ifelse (fascia_potenza = 2 and anno_realizzazione = 2007) [ set kW_2FP_2007 kW_2FP_2007 + potenza_impianto][
+  ifelse (fascia_potenza = 2 and anno_realizzazione = 2008) [ set kW_2FP_2008 kW_2FP_2008 + potenza_impianto][
+  ifelse (fascia_potenza = 2 and anno_realizzazione = 2009) [ set kW_2FP_2009 kW_2FP_2009 + potenza_impianto][
+  ifelse (fascia_potenza = 2 and anno_realizzazione = 2010) [ set kW_2FP_2010 kW_2FP_2010 + potenza_impianto][
+  ifelse (fascia_potenza = 2 and anno_realizzazione = 2011) [ set kW_2FP_2011 kW_2FP_2011 + potenza_impianto][
+  ifelse (fascia_potenza = 2 and anno_realizzazione = 2012) [ set kW_2FP_2012 kW_2FP_2012 + potenza_impianto][
+  ifelse (fascia_potenza = 2 and anno_realizzazione = 2013) [ set kW_2FP_2013 kW_2FP_2013 + potenza_impianto][
+  ifelse (fascia_potenza = 3 and anno_realizzazione = 2007) [ set kW_3FP_2007 kW_3FP_2007 + potenza_impianto][
+  ifelse (fascia_potenza = 3 and anno_realizzazione = 2008) [ set kW_3FP_2008 kW_3FP_2008 + potenza_impianto][
+  ifelse (fascia_potenza = 3 and anno_realizzazione = 2009) [ set kW_3FP_2009 kW_3FP_2009 + potenza_impianto][
+  ifelse (fascia_potenza = 3 and anno_realizzazione = 2010) [ set kW_3FP_2010 kW_3FP_2010 + potenza_impianto][
+  ifelse (fascia_potenza = 3 and anno_realizzazione = 2011) [ set kW_3FP_2011 kW_3FP_2011 + potenza_impianto][
+  ifelse (fascia_potenza = 3 and anno_realizzazione = 2012) [ set kW_3FP_2012 kW_3FP_2012 + potenza_impianto][
+  ifelse (fascia_potenza = 3 and anno_realizzazione = 2013) [ set kW_3FP_2013 kW_3FP_2013 + potenza_impianto][
+  ifelse (fascia_potenza = 4 and anno_realizzazione = 2007) [ set kW_4FP_2007 kW_4FP_2007 + potenza_impianto][
+  ifelse (fascia_potenza = 4 and anno_realizzazione = 2008) [ set kW_4FP_2008 kW_4FP_2008 + potenza_impianto][
+  ifelse (fascia_potenza = 4 and anno_realizzazione = 2009) [ set kW_4FP_2009 kW_4FP_2009 + potenza_impianto][
+  ifelse (fascia_potenza = 4 and anno_realizzazione = 2010) [ set kW_4FP_2010 kW_4FP_2010 + potenza_impianto][
+  ifelse (fascia_potenza = 4 and anno_realizzazione = 2011) [ set kW_4FP_2011 kW_4FP_2011 + potenza_impianto][
+  ifelse (fascia_potenza = 4 and anno_realizzazione = 2012) [ set kW_4FP_2012 kW_4FP_2012 + potenza_impianto][
+  ifelse (fascia_potenza = 4 and anno_realizzazione = 2013) [ set kW_4FP_2013 kW_4FP_2013 + potenza_impianto][
+  ifelse (fascia_potenza = 5 and anno_realizzazione = 2007) [ set kW_5FP_2007 kW_5FP_2007 + potenza_impianto][
+  ifelse (fascia_potenza = 5 and anno_realizzazione = 2008) [ set kW_5FP_2008 kW_5FP_2008 + potenza_impianto][
+  ifelse (fascia_potenza = 5 and anno_realizzazione = 2009) [ set kW_5FP_2009 kW_5FP_2009 + potenza_impianto][
+  ifelse (fascia_potenza = 5 and anno_realizzazione = 2010) [ set kW_5FP_2010 kW_5FP_2010 + potenza_impianto][
+  ifelse (fascia_potenza = 5 and anno_realizzazione = 2011) [ set kW_5FP_2011 kW_5FP_2011 + potenza_impianto][
+  ifelse (fascia_potenza = 5 and anno_realizzazione = 2012) [ set kW_5FP_2012 kW_5FP_2012 + potenza_impianto][
+  ifelse (fascia_potenza = 5 and anno_realizzazione = 2013) [ set kW_5FP_2013 kW_5FP_2013 + potenza_impianto][
+  ifelse (fascia_potenza = 6 and anno_realizzazione = 2007) [ set kW_6FP_2007 kW_6FP_2007 + potenza_impianto][
+  ifelse (fascia_potenza = 6 and anno_realizzazione = 2008) [ set kW_6FP_2008 kW_6FP_2008 + potenza_impianto][
+  ifelse (fascia_potenza = 6 and anno_realizzazione = 2009) [ set kW_6FP_2009 kW_6FP_2009 + potenza_impianto][
+  ifelse (fascia_potenza = 6 and anno_realizzazione = 2010) [ set kW_6FP_2010 kW_6FP_2010 + potenza_impianto][
+  ifelse (fascia_potenza = 6 and anno_realizzazione = 2011) [ set kW_6FP_2011 kW_6FP_2011 + potenza_impianto][
+  ifelse (fascia_potenza = 6 and anno_realizzazione = 2012) [ set kW_6FP_2012 kW_6FP_2012 + potenza_impianto][
+  ifelse (fascia_potenza = 6 and anno_realizzazione = 2013) [ set kW_6FP_2013 kW_6FP_2013 + potenza_impianto][
+  ]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]
+  
 end
 
 
@@ -1448,6 +1606,51 @@ to aggiorna_pf_FP
   ifelse fascia_potenza = 6 [ set count_pf_6FP count_pf_6FP + 1][
     ;; default case
   ]]]]]]
+  
+  ;; aggiornamento numero impianti installati per FP ogni anno
+  ifelse (fascia_potenza = 1 and anno_realizzazione = 2007) [ set count_pf_1FP_2007 count_pf_1FP_2007 + 1][
+  ifelse (fascia_potenza = 1 and anno_realizzazione = 2008) [ set count_pf_1FP_2008 count_pf_1FP_2008 + 1][
+  ifelse (fascia_potenza = 1 and anno_realizzazione = 2009) [ set count_pf_1FP_2009 count_pf_1FP_2009 + 1][
+  ifelse (fascia_potenza = 1 and anno_realizzazione = 2010) [ set count_pf_1FP_2010 count_pf_1FP_2010 + 1][
+  ifelse (fascia_potenza = 1 and anno_realizzazione = 2011) [ set count_pf_1FP_2011 count_pf_1FP_2011 + 1][
+  ifelse (fascia_potenza = 1 and anno_realizzazione = 2012) [ set count_pf_1FP_2012 count_pf_1FP_2012 + 1][
+  ifelse (fascia_potenza = 1 and anno_realizzazione = 2013) [ set count_pf_1FP_2013 count_pf_1FP_2013 + 1][
+  ifelse (fascia_potenza = 2 and anno_realizzazione = 2007) [ set count_pf_2FP_2007 count_pf_2FP_2007 + 1][
+  ifelse (fascia_potenza = 2 and anno_realizzazione = 2008) [ set count_pf_2FP_2008 count_pf_2FP_2008 + 1][
+  ifelse (fascia_potenza = 2 and anno_realizzazione = 2009) [ set count_pf_2FP_2009 count_pf_2FP_2009 + 1][
+  ifelse (fascia_potenza = 2 and anno_realizzazione = 2010) [ set count_pf_2FP_2010 count_pf_2FP_2010 + 1][
+  ifelse (fascia_potenza = 2 and anno_realizzazione = 2011) [ set count_pf_2FP_2011 count_pf_2FP_2011 + 1][
+  ifelse (fascia_potenza = 2 and anno_realizzazione = 2012) [ set count_pf_2FP_2012 count_pf_2FP_2012 + 1][
+  ifelse (fascia_potenza = 2 and anno_realizzazione = 2013) [ set count_pf_2FP_2013 count_pf_2FP_2013 + 1][
+  ifelse (fascia_potenza = 3 and anno_realizzazione = 2007) [ set count_pf_3FP_2007 count_pf_3FP_2007 + 1][
+  ifelse (fascia_potenza = 3 and anno_realizzazione = 2008) [ set count_pf_3FP_2008 count_pf_3FP_2008 + 1][
+  ifelse (fascia_potenza = 3 and anno_realizzazione = 2009) [ set count_pf_3FP_2009 count_pf_3FP_2009 + 1][
+  ifelse (fascia_potenza = 3 and anno_realizzazione = 2010) [ set count_pf_3FP_2010 count_pf_3FP_2010 + 1][
+  ifelse (fascia_potenza = 3 and anno_realizzazione = 2011) [ set count_pf_3FP_2011 count_pf_3FP_2011 + 1][
+  ifelse (fascia_potenza = 3 and anno_realizzazione = 2012) [ set count_pf_3FP_2012 count_pf_3FP_2012 + 1][
+  ifelse (fascia_potenza = 3 and anno_realizzazione = 2013) [ set count_pf_3FP_2013 count_pf_3FP_2013 + 1][
+  ifelse (fascia_potenza = 4 and anno_realizzazione = 2007) [ set count_pf_4FP_2007 count_pf_4FP_2007 + 1][
+  ifelse (fascia_potenza = 4 and anno_realizzazione = 2008) [ set count_pf_4FP_2008 count_pf_4FP_2008 + 1][
+  ifelse (fascia_potenza = 4 and anno_realizzazione = 2009) [ set count_pf_4FP_2009 count_pf_4FP_2009 + 1][
+  ifelse (fascia_potenza = 4 and anno_realizzazione = 2010) [ set count_pf_4FP_2010 count_pf_4FP_2010 + 1][
+  ifelse (fascia_potenza = 4 and anno_realizzazione = 2011) [ set count_pf_4FP_2011 count_pf_4FP_2011 + 1][
+  ifelse (fascia_potenza = 4 and anno_realizzazione = 2012) [ set count_pf_4FP_2012 count_pf_4FP_2012 + 1][
+  ifelse (fascia_potenza = 4 and anno_realizzazione = 2013) [ set count_pf_4FP_2013 count_pf_4FP_2013 + 1][
+  ifelse (fascia_potenza = 5 and anno_realizzazione = 2007) [ set count_pf_5FP_2007 count_pf_5FP_2007 + 1][
+  ifelse (fascia_potenza = 5 and anno_realizzazione = 2008) [ set count_pf_5FP_2008 count_pf_5FP_2008 + 1][
+  ifelse (fascia_potenza = 5 and anno_realizzazione = 2009) [ set count_pf_5FP_2009 count_pf_5FP_2009 + 1][
+  ifelse (fascia_potenza = 5 and anno_realizzazione = 2010) [ set count_pf_5FP_2010 count_pf_5FP_2010 + 1][
+  ifelse (fascia_potenza = 5 and anno_realizzazione = 2011) [ set count_pf_5FP_2011 count_pf_5FP_2011 + 1][
+  ifelse (fascia_potenza = 5 and anno_realizzazione = 2012) [ set count_pf_5FP_2012 count_pf_5FP_2012 + 1][
+  ifelse (fascia_potenza = 5 and anno_realizzazione = 2013) [ set count_pf_5FP_2013 count_pf_5FP_2013 + 1][
+  ifelse (fascia_potenza = 6 and anno_realizzazione = 2007) [ set count_pf_6FP_2007 count_pf_6FP_2007 + 1][
+  ifelse (fascia_potenza = 6 and anno_realizzazione = 2008) [ set count_pf_6FP_2008 count_pf_6FP_2008 + 1][
+  ifelse (fascia_potenza = 6 and anno_realizzazione = 2009) [ set count_pf_6FP_2009 count_pf_6FP_2009 + 1][
+  ifelse (fascia_potenza = 6 and anno_realizzazione = 2010) [ set count_pf_6FP_2010 count_pf_6FP_2010 + 1][
+  ifelse (fascia_potenza = 6 and anno_realizzazione = 2011) [ set count_pf_6FP_2011 count_pf_6FP_2011 + 1][
+  ifelse (fascia_potenza = 6 and anno_realizzazione = 2012) [ set count_pf_6FP_2012 count_pf_6FP_2012 + 1][
+  ifelse (fascia_potenza = 6 and anno_realizzazione = 2013) [ set count_pf_6FP_2013 count_pf_6FP_2013 + 1][
+  ]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]
 end
 
 ;; aggiorna il numero di impianti PV divisi per Conto Energia
@@ -1690,6 +1893,93 @@ to calcola_prezzi_minimi_gse
                  set prezzi_minimi_gse fput letto prezzi_minimi_gse
                ]
                file-close
+            ]
+          ];; fine else non 2011
+        ];; fine else non 2010
+      ];; fine else non 2009
+    ];; fine else non 2008
+  ];; fine else non 2007
+end
+
+
+;; PROCEDURA PER LA LETTURA DEI PREZZI dell'energia elettrica al consumatore finale (da me stimati per il periodo 2007-2013)
+to calcola_prezzi_elettricita_consumatore
+  ifelse (anno = 2007 and file-exists? "PrezziConsumatore2007.txt" ) 
+  [
+    file-open "PrezziConsumatore2007.txt"
+               while [ not file-at-end? ]
+               [
+                 let letto file-read
+                 set costo_kwh_consumo fput letto costo_kwh_consumo
+               ]
+               file-close
+  ]
+  [;; else non 2007
+    ifelse (anno = 2008 and file-exists? "PrezziConsumatore2008.txt" )
+    [
+      file-open "PrezziConsumatore2008.txt"
+               while [ not file-at-end? ]
+               [
+                 let letto file-read
+                 set costo_kwh_consumo fput letto costo_kwh_consumo
+               ]
+               file-close
+    ]
+    [;; else non 2008
+      ifelse (anno = 2009 and file-exists? "PrezziConsumatore2009.txt" )
+      [
+        file-open "PrezziConsumatore2009.txt"
+               while [ not file-at-end? ]
+               [
+                 let letto file-read
+                 set costo_kwh_consumo fput letto costo_kwh_consumo
+               ]
+               file-close
+      ]
+      [;; else non 2009
+        ifelse (anno = 2010 and file-exists? "PrezziConsumatore2010.txt" )
+        [
+          file-open "PrezziConsumatore2010.txt"
+               while [ not file-at-end? ]
+               [
+                 let letto file-read
+                 set costo_kwh_consumo fput letto costo_kwh_consumo
+               ]
+               file-close
+        ]
+        [;; else non 2010
+          ifelse (anno = 2011 and file-exists? "PrezziConsumatore2011.txt" )
+          [
+            file-open "PrezziConsumatore2011.txt"
+               while [ not file-at-end? ]
+               [
+                 let letto file-read
+                 set costo_kwh_consumo fput letto costo_kwh_consumo
+               ]
+               file-close
+          ]
+          [;; else non 2011
+            ifelse (anno = 2012 and file-exists? "PrezziConsumatore2012.txt" ) 
+            [
+               file-open "PrezziConsumatore2012.txt"
+               while [ not file-at-end? ]
+               [
+                 let letto file-read
+                 set costo_kwh_consumo fput letto costo_kwh_consumo
+               ]
+               file-close
+            ]
+            [
+              if ( file-exists? "PrezziConsumatore2013.txt" )
+              [
+                file-open "PrezziConsumatore2013.txt"
+                while [ not file-at-end? ]
+                [
+                  let letto file-read
+                  set costo_kwh_consumo fput letto costo_kwh_consumo
+                ]
+                file-close
+              ]
             ]
           ];; fine else non 2011
         ];; fine else non 2010
@@ -2063,18 +2353,20 @@ end
 
 ;; PROCEDURA CHE AGGIORNA A RUN TIME I PREZZI DELL'ENERGIA E I PREZZI GARANTITI GSE
 to aggiorna_prezzi
-  set costo_kwh_fascia1  precision   (costo_kwh_fascia1 + ( (costo_kwh_fascia1  *  variazione_annuale_prezzi_elettricita ) / 100 ) ) 3
-  set costo_kwh_fascia2  precision (costo_kwh_fascia2 +   ( (costo_kwh_fascia2  *  variazione_annuale_prezzi_elettricita ) / 100 ) ) 3
-  set costo_kwh_fascia3  precision (costo_kwh_fascia3 + ( (costo_kwh_fascia3  *  variazione_annuale_prezzi_elettricita ) / 100) ) 3
-  set costo_kwh_fascia4 precision (costo_kwh_fascia4 + ( (costo_kwh_fascia4  *  variazione_annuale_prezzi_elettricita ) / 100) ) 3
-  set costo_kwh_fascia5 precision (costo_kwh_fascia5 + ( (costo_kwh_fascia5  *  variazione_annuale_prezzi_elettricita )  / 100) )3
+  ;; nella versione con CE questi prezzi dell'energia non sono usati e quindi è inutile aggiornarli --> vengono usate serie storiche
+;  set costo_kwh_fascia1  precision   (costo_kwh_fascia1 + ( (costo_kwh_fascia1  *  variazione_annuale_prezzi_elettricita ) / 100 ) ) 3
+;  set costo_kwh_fascia2  precision (costo_kwh_fascia2 +   ( (costo_kwh_fascia2  *  variazione_annuale_prezzi_elettricita ) / 100 ) ) 3
+;  set costo_kwh_fascia3  precision (costo_kwh_fascia3 + ( (costo_kwh_fascia3  *  variazione_annuale_prezzi_elettricita ) / 100) ) 3
+;  set costo_kwh_fascia4 precision (costo_kwh_fascia4 + ( (costo_kwh_fascia4  *  variazione_annuale_prezzi_elettricita ) / 100) ) 3
+;  set costo_kwh_fascia5 precision (costo_kwh_fascia5 + ( (costo_kwh_fascia5  *  variazione_annuale_prezzi_elettricita )  / 100) )3
   
   ;; nella versione con CE questi prezzi minimi gse non sono usati e quindi è inutile aggiornarli --> vengono usate serie storiche
-  set prezzi_minimi_gsef1 precision  ( prezzi_minimi_gsef1 +  ( (prezzi_minimi_gsef1  *  variazione_annuale_prezzi_elettricita )  / 100 ) ) 3
-  set prezzi_minimi_gsef2 precision  (prezzi_minimi_gsef2 +  ( (prezzi_minimi_gsef2  *  variazione_annuale_prezzi_elettricita )  / 100 ) )3
-  set prezzi_minimi_gsef3 precision  (prezzi_minimi_gsef3 +  ( (prezzi_minimi_gsef3  *  variazione_annuale_prezzi_elettricita )  / 100 ) ) 3
+;  set prezzi_minimi_gsef1 precision  ( prezzi_minimi_gsef1 +  ( (prezzi_minimi_gsef1  *  variazione_annuale_prezzi_elettricita )  / 100 ) ) 3
+;  set prezzi_minimi_gsef2 precision  (prezzi_minimi_gsef2 +  ( (prezzi_minimi_gsef2  *  variazione_annuale_prezzi_elettricita )  / 100 ) )3
+;  set prezzi_minimi_gsef3 precision  (prezzi_minimi_gsef3 +  ( (prezzi_minimi_gsef3  *  variazione_annuale_prezzi_elettricita )  / 100 ) ) 3
   
   set Costo_Medio_kwP (Costo_Medio_kwP  -  round ( (Costo_Medio_kwP * Riduzione_anno_%costo_pannello ) / 100) )
+  
 end
 
 ;; AGGIORNAMENTO DATI IMPIANTO    
@@ -2248,30 +2540,40 @@ end
 to calcola_ricavi_da_autoconsumo
   ifelse ( consumo_medio_annuale  < 1000 )
     [
-      let ricavo_autoconsumo   precision ( kw_autoconsumo * costo_kwh_fascia1 ) 2
+      ;; vecchia versione Croce
+      ;; let ricavo_autoconsumo   precision ( kw_autoconsumo * costo_kwh_fascia1 ) 2
+      let ricavo_autoconsumo   precision ( kw_autoconsumo * ( item 4 costo_kwh_consumo ) ) 2
       set ricavi_autoconsumo lput ricavo_autoconsumo ricavi_autoconsumo      
     ]
     [
       ifelse ( consumo_medio_annuale  >= 1000 and consumo_medio_annuale < 2500 )
         [
-          let ricavo_autoconsumo   precision  ( kw_autoconsumo * costo_kwh_fascia2 ) 2 
+          ;; vecchia versione Croce
+          ;; let ricavo_autoconsumo   precision  ( kw_autoconsumo * costo_kwh_fascia2 ) 2 
+          let ricavo_autoconsumo   precision ( kw_autoconsumo * ( item 3 costo_kwh_consumo ) ) 2
           set ricavi_autoconsumo lput ricavo_autoconsumo ricavi_autoconsumo 
         ]
         [
           ifelse ( consumo_medio_annuale >= 2500 and consumo_medio_annuale < 5000 )
           [
-            let ricavo_autoconsumo  precision  ( kw_autoconsumo * costo_kwh_fascia3 ) 2
+            ;; vecchia versione Croce
+            ;; let ricavo_autoconsumo  precision  ( kw_autoconsumo * costo_kwh_fascia3 ) 2
+            let ricavo_autoconsumo   precision ( kw_autoconsumo * ( item 2 costo_kwh_consumo ) ) 2
             set ricavi_autoconsumo lput ricavo_autoconsumo ricavi_autoconsumo    
           ]
           [
             ifelse ( consumo_medio_annuale >= 5000 and consumo_medio_annuale < 15000 )
             [
-              let ricavo_autoconsumo  precision  ( kw_autoconsumo * costo_kwh_fascia4 ) 2
+              ;; vecchia versione Croce
+              ;; let ricavo_autoconsumo  precision  ( kw_autoconsumo * costo_kwh_fascia4 ) 2
+              let ricavo_autoconsumo   precision ( kw_autoconsumo * ( item 1 costo_kwh_consumo ) ) 2
               set ricavi_autoconsumo lput ricavo_autoconsumo ricavi_autoconsumo  
             ]
             
             [
-              let ricavo_autoconsumo precision (  kw_autoconsumo * costo_kwh_fascia5 ) 2 
+              ;; vecchia versione Croce
+              ;; let ricavo_autoconsumo precision (  kw_autoconsumo * costo_kwh_fascia5 ) 2 
+              let ricavo_autoconsumo   precision ( kw_autoconsumo * ( item 0 costo_kwh_consumo ) ) 2
               set ricavi_autoconsumo lput ricavo_autoconsumo ricavi_autoconsumo
               
             ]
@@ -2285,33 +2587,43 @@ end
 to calcola_costi_energia_prelevata
   ifelse ( kw_prelevati   < 1000 )
     [
-      let costo_energia_prelevata   precision ( kw_prelevati  * costo_kwh_fascia1 ) 2
+      ;; vecchia versione Croce
+      ;; let costo_energia_prelevata   precision ( kw_prelevati  * costo_kwh_fascia1 ) 2
+      let costo_energia_prelevata   precision ( kw_prelevati * ( item 4 costo_kwh_consumo ) ) 2
       set costi_energia_prelevata lput costo_energia_prelevata costi_energia_prelevata
       set costi_tot_energia_prelevata precision (costi_tot_energia_prelevata + costo_energia_prelevata ) 2   
     ]
     [
       ifelse ( kw_prelevati >= 1000 and kw_prelevati < 2500 )
         [
-          let costo_energia_prelevata   precision  ( kw_prelevati * costo_kwh_fascia2 ) 2 
+          ;; vecchia versione Croce
+          ;; let costo_energia_prelevata   precision  ( kw_prelevati * costo_kwh_fascia2 ) 2 
+          let costo_energia_prelevata   precision ( kw_prelevati * ( item 3 costo_kwh_consumo ) ) 2
           set costi_energia_prelevata lput costo_energia_prelevata costi_energia_prelevata
           set costi_tot_energia_prelevata precision (costi_tot_energia_prelevata + costo_energia_prelevata ) 2 
         ]
         [
           ifelse ( kw_prelevati >= 2500 and kw_prelevati < 5000 )
           [
-            let costo_energia_prelevata  precision  (kw_prelevati * costo_kwh_fascia3 ) 2
+            ;; vecchia versione Croce
+            ;; let costo_energia_prelevata  precision  (kw_prelevati * costo_kwh_fascia3 ) 2
+            let costo_energia_prelevata   precision ( kw_prelevati * ( item 2 costo_kwh_consumo ) ) 2
             set costi_energia_prelevata lput costo_energia_prelevata costi_energia_prelevata
             set costi_tot_energia_prelevata precision (costi_tot_energia_prelevata + costo_energia_prelevata ) 2 
           ]
           [
             ifelse ( kw_prelevati >= 5000 and kw_prelevati < 15000 )
             [
-              let costo_energia_prelevata  precision  (kw_prelevati * costo_kwh_fascia4 ) 2
+              ;; vecchia versione Croce
+              ;; let costo_energia_prelevata  precision  (kw_prelevati * costo_kwh_fascia4 ) 2
+              let costo_energia_prelevata   precision ( kw_prelevati * ( item 1 costo_kwh_consumo ) ) 2
               set costi_energia_prelevata lput costo_energia_prelevata costi_energia_prelevata
               set costi_tot_energia_prelevata precision (costi_tot_energia_prelevata + costo_energia_prelevata ) 2 
             ]
             [
-              let costo_energia_prelevata precision (  kw_prelevati * costo_kwh_fascia5 ) 2 
+              ;; vecchia versione Croce
+              ;; let costo_energia_prelevata precision (  kw_prelevati * costo_kwh_fascia5 ) 2 
+              let costo_energia_prelevata   precision ( kw_prelevati * ( item 0 costo_kwh_consumo ) ) 2
               set costi_energia_prelevata lput costo_energia_prelevata costi_energia_prelevata
               set costi_tot_energia_prelevata precision (costi_tot_energia_prelevata + costo_energia_prelevata ) 2 
             ]
@@ -2370,11 +2682,18 @@ to stima_roe
   let stima_prezzi_minimi_gsef2 item 1 prezzi_minimi_gse
   let stima_prezzi_minimi_gsef3 item 0 prezzi_minimi_gse
   
-  let stima_costo_kwh_fascia1 costo_kwh_fascia1
-  let stima_costo_kwh_fascia2 costo_kwh_fascia2
-  let stima_costo_kwh_fascia3 costo_kwh_fascia3
-  let stima_costo_kwh_fascia4 costo_kwh_fascia4
-  let stima_costo_kwh_fascia5 costo_kwh_fascia5
+  ;; versione vecchia con i prezzi presi da interfaccia e poi aggiornati annualmente
+;  let stima_costo_kwh_fascia1 costo_kwh_fascia1
+;  let stima_costo_kwh_fascia2 costo_kwh_fascia2
+;  let stima_costo_kwh_fascia3 costo_kwh_fascia3
+;  let stima_costo_kwh_fascia4 costo_kwh_fascia4
+;  let stima_costo_kwh_fascia5 costo_kwh_fascia5
+  ;; versione con i prezzi dell'energia presi da serie storiche 
+  let stima_costo_kwh_fascia1 item 4 costo_kwh_consumo
+  let stima_costo_kwh_fascia2 item 3 costo_kwh_consumo
+  let stima_costo_kwh_fascia3 item 2 costo_kwh_consumo
+  let stima_costo_kwh_fascia4 item 1 costo_kwh_consumo
+  let stima_costo_kwh_fascia5 item 0 costo_kwh_consumo
     
   ;;questo ciclo calcola i ricavi e i flussi di cassa stimati per i 20 anni di vita degli impianti
   repeat 20 [
@@ -2480,6 +2799,8 @@ to stima_roe
     set indice_vita_impianto  indice_vita_impianto + 1
     
     ;; a fine anno i prezzi stimati vengono aggiornati
+    ;; la stima viene aggiornata considerando una variazione annuale dei prezzi dell'elettricita fissa e imposta come parametro --> in realtà essa varia annualmene e quindi 
+    ;; le stime del roe potrebbero differire (in modo significativo? controllare) dal roe effettivamente calcolato
     set stima_costo_kwh_fascia1  precision   (stima_costo_kwh_fascia1 + ( (stima_costo_kwh_fascia1  *  variazione_annuale_prezzi_elettricita ) / 100 ) ) 3
     set stima_costo_kwh_fascia2  precision (stima_costo_kwh_fascia2 +   ( (stima_costo_kwh_fascia2  *  variazione_annuale_prezzi_elettricita ) / 100 ) ) 3
     set stima_costo_kwh_fascia3  precision (stima_costo_kwh_fascia3 + ( (stima_costo_kwh_fascia3  *  variazione_annuale_prezzi_elettricita ) / 100) ) 3
@@ -2983,12 +3304,35 @@ to write_pl_file
 end
 
 ;; stampa su file i kW installati ogni anno con i vari Conto Energia
-to write_CE_file
+to write_kW_CE_file
   file-open "/media/sda4/ePolicy/simulationModel/output/kW_CE.csv"
   ;; i valori presenti in ogni riga sono: kW 2007, kW 2008, kW 2009, kW 2010, kW 2011, kW 2012, kW 2013,
-  file-print (word kW2007 ", " kW2008 ", " kW2009 ", " kW2010 ", " kW2011 ", " kW2012 ", " kW2013)
+  ;; file-print (word kW2007 ", " kW2008 ", " kW2009 ", " kW2010 ", " kW2011 ", " kW2012 ", " kW2013)
+  
+  ;; ora stampo i kw annuali divisi per classe di potenza (fasce potenza 1,2,3)
+;  file-print (word kW_1FP_2007 ", " kW_1FP_2008 ", " kW_1FP_2009 ", " kW_1FP_2010 ", " kW_1FP_2011 ", " kW_1FP_2012 ", " kW_1FP_2013 ", "
+;    kW_2FP_2007 ", " kW_2FP_2008 ", " kW_2FP_2009 ", " kW_2FP_2010 ", " kW_2FP_2011 ", " kW_2FP_2012 ", " kW_2FP_2013 ", "
+;    kW_3FP_2007 ", " kW_3FP_2008 ", " kW_3FP_2009 ", " kW_3FP_2010 ", " kW_3FP_2011 ", " kW_3FP_2012 ", " kW_3FP_2013 )
+  
+  file-print (word kW_1FP_2007 ", " kW_1FP_2008 ", " kW_1FP_2009 ", " kW_1FP_2010 ", " kW_1FP_2011 ", " kW_1FP_2012 ", " kW_1FP_2013 ", "
+    kW_2FP_2007 ", " kW_2FP_2008 ", " kW_2FP_2009 ", " kW_2FP_2010 ", " kW_2FP_2011 ", " kW_2FP_2012 ", " kW_2FP_2013 ", "
+    kW_3FP_2007 ", " kW_3FP_2008 ", " kW_3FP_2009 ", " kW_3FP_2010 ", " kW_3FP_2011 ", " kW_3FP_2012 ", " kW_3FP_2013 ", "
+    kW2007 ", " kW2008 ", " kW2009 ", " kW2010 ", " kW2011 ", " kW2012 ", " kW2013 )
+  
   file-close
   
+end
+
+;; stampa su file il numero di impianti installati ogni anno con i vari Conto Energia
+to write_count_pf_CE_file
+  file-open "/media/sda4/ePolicy/simulationModel/output/count_pf_CE.csv"
+  
+  ;; stampo il numero di impianti installati annualmente divisi per classe di potenza (fasce potenza 1,2,3)
+  file-print (word count_pf_1FP_2007 ", " count_pf_1FP_2008 ", " count_pf_1FP_2009 ", " count_pf_1FP_2010 ", " count_pf_1FP_2011 ", " count_pf_1FP_2012 ", " count_pf_1FP_2013 ", "
+    count_pf_2FP_2007 ", " count_pf_2FP_2008 ", " count_pf_2FP_2009 ", " count_pf_2FP_2010 ", " count_pf_2FP_2011 ", " count_pf_2FP_2012 ", " count_pf_2FP_2013 ", "
+    count_pf_3FP_2007 ", " count_pf_3FP_2008 ", " count_pf_3FP_2009 ", " count_pf_3FP_2010 ", " count_pf_3FP_2011 ", " count_pf_3FP_2012 ", " count_pf_3FP_2013 ", ")
+  
+  file-close
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
@@ -3340,16 +3684,6 @@ Perdita_efficienza_annuale_pannello
 0.3 0.5 0.8 1
 1
 
-TEXTBOX
-284
-669
-561
-747
-GSE Prezzi Minimi Garantiti Kw Immessi\ntariffe minime garantite dal gse 2011 per impianti piccoli\nFascia 1 (inferiori a 0.5 Mwh) 0.103 euro\\KWh \nFascia 2 (da 0.5 Mwh a 1 Mwh) 0.086 euro\\KWh\nFascia 3 (da 1 Mwh a 2 Mwh)   0.076 euro\\KWh
-11
-0.0
-1
-
 SLIDER
 849
 475
@@ -3441,7 +3775,7 @@ NumeroAgenti
 NumeroAgenti
 1
 250
-50
+200
 1
 1
 NIL
@@ -3857,7 +4191,7 @@ SWITCH
 365
 LeggiSerieStoriche
 LeggiSerieStoriche
-0
+1
 1
 -1000
 
@@ -3930,7 +4264,7 @@ CHOOSER
 fr
 fr
 "Nessuno" "Asta" "Conto interessi" "Rotazione" "Garanzia"
-1
+0
 
 SLIDER
 17
@@ -3941,7 +4275,7 @@ BudgetRegione
 BudgetRegione
 0.1
 15
-0.1
+5
 0.1
 1
 milioni
@@ -3966,7 +4300,7 @@ Raggio
 Raggio
 1
 10
-5
+0.1
 1
 1
 patches
@@ -4716,7 +5050,7 @@ BudgetRegione2010
 BudgetRegione2010
 0
 10
-2
+0
 0.1
 1
 milioni
@@ -4731,7 +5065,7 @@ BudgetRegione2011
 BudgetRegione2011
 0
 10
-2
+0
 0.1
 1
 milioni
@@ -5835,6 +6169,16 @@ count_pf2013
 1
 11
 
+TEXTBOX
+297
+663
+447
+723
+I prezzi dell'energia al consumo non sono più selezionabili tramite interfaccia
+12
+24.0
+1
+
 @#$#@#$#@
 ## CREDITS AND REFERENCES
 
@@ -6152,7 +6496,7 @@ NetLogo 5.0.2
 @#$#@#$#@
 @#$#@#$#@
 <experiments>
-  <experiment name="kW_installed_yearly_CE" repetitions="1000" runMetricsEveryStep="false">
+  <experiment name="kW_installed_yearly_CE" repetitions="500" runMetricsEveryStep="false">
     <setup>setup</setup>
     <go>go</go>
     <enumeratedValueSet variable="NumeroAgenti">
@@ -6225,7 +6569,7 @@ NetLogo 5.0.2
       <value value="2"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="Raggio">
-      <value value="10"/>
+      <value value="0.1"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="InterBanca">
       <value value="5"/>
@@ -6307,6 +6651,172 @@ NetLogo 5.0.2
     </enumeratedValueSet>
     <enumeratedValueSet variable="Aumento_%annuo_consumi">
       <value value="0.9"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="kW_installed_yearly_condizioni_sfav" repetitions="500" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <enumeratedValueSet variable="Tasso_lordo_rendimento_BOT">
+      <value value="2.147"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="BudgetRegione2011">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Incentivi_Installazione">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="PercMax">
+      <value value="80"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="BudgetRegione2010">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="BudgetRegione">
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Manutenzione_anno_%costo_totale">
+      <value value="1.5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="FallimentoMutuo">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Budget_Medio_MiliaiaEuro">
+      <value value="100"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Anni_Restituzione_mutuo_regione">
+      <value value="20"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="BudgetRegione2008">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="PercMin">
+      <value value="20"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="InterBanca">
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="BudgetRegione2015">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Irradiazione_media_annua_kwh_kwp">
+      <value value="1350"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="costo_kwh_fascia4">
+      <value value="0.246"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Percentuale_Interessi_Prestito">
+      <value value="4.3"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="fr">
+      <value value="&quot;Nessuno&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Anni_Restituzione_mutuo_banca">
+      <value value="20"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="costo_kwh_fascia3">
+      <value value="0.194"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="variazione_annuale_prezzi_elettricita">
+      <value value="1.8"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="%_Variazione_Tariffe">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="%_Incentivi_Installazione">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Varia_Tariffe_Incetivanti">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Incentivi_Dinamici">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="LeggiSerieStoriche">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Sensibilita">
+      <value value="2"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="BudgetRegione2016">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Indice_condizioni_sfavorevoli">
+      <value value="7.5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="costo_kwh_fascia5">
+      <value value="0.276"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="BudgetRegione2012">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Raggio">
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Perdita_efficienza_annuale_pannello">
+      <value value="0.5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Media%_copertura_consumi_richiesta">
+      <value value="70"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Riduzione_anno_%costo_pannello">
+      <value value="3"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Anni_Restituzione_Prestiti">
+      <value value="20"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Variazione_annuale_condizioni">
+      <value value="0.1"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="InfluenzaRate">
+      <value value="40"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="M2_Disposizione">
+      <value value="100"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="BudgetRegione2014">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="costo_kwh_fascia2">
+      <value value="0.162"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Consumo_medio_annuale_KWh">
+      <value value="15200"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Aumento_%annuo_consumi">
+      <value value="0.9"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="NumeroAgenti">
+      <value value="200"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="ROE_minimo_desiderato">
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Intorno">
+      <value value="true"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="costo_kwh_fascia1">
+      <value value="0.278"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="InterRegione">
+      <value value="1"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Probfinanz">
+      <value value="90"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Costo_Medio_kwP">
+      <value value="4300"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Tecnologia_Pannello">
+      <value value="&quot;Monocristallini&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Accettato">
+      <value value="85"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="BudgetRegione2013">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="BudgetRegione2009">
+      <value value="0"/>
     </enumeratedValueSet>
   </experiment>
 </experiments>

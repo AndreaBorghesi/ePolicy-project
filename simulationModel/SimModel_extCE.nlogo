@@ -276,7 +276,9 @@ to go
     
     ;; scrivo su file i risultati relativi ai kW installati ogni anno con i diversi Conti Energia
     ;write_kW_CE_file
-    write_count_pf_CE_file
+    ;; scrivo su file i risultati relativi al numero di impianti installati ogni anno con i diversi Conti Energia
+    ;write_count_pf_CE_file
+    
         
    ;;resetta alcune variabili per non avere probemi con simulazioni successive
    reset_var
@@ -3323,6 +3325,7 @@ to write_kW_CE_file
   
 end
 
+
 ;; stampa su file il numero di impianti installati ogni anno con i vari Conto Energia
 to write_count_pf_CE_file
   file-open "/media/sda4/ePolicy/simulationModel/output/count_pf_CE.csv"
@@ -4300,7 +4303,7 @@ Raggio
 Raggio
 1
 10
-0.1
+5
 1
 1
 patches

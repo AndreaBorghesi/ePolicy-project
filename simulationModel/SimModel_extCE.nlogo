@@ -99,6 +99,12 @@ globals [ wacc m2Kwp  count_tick scala_dim_impianto time anno number durata_impi
   sum_roe_stimato_morti_2014 sum_roe_stimato_morti_2015 sum_roe_stimato_morti_2016
   sum_roe_stimato_morti_CE_2 sum_roe_stimato_morti_CE_3 sum_roe_stimato_morti_CE_4 sum_roe_stimato_morti_CE_5
   
+  ;; variabili per simulare il grado di diffusione della conoscenza della tecnologia e incentivi PV --> se gli agenti non sanno che esiste la possibilità o la convenienza di installare
+  ;; un impianto non prendono nemmeno in considerazione l'idea
+  percentuale_conoscenza_PV  ;; la percentuale di agenti che ogni anno è a conoscenza delle possibilità offerte dal PV: il valore è inizialmente settato tramite interfaccia grafica
+  ;; variabili per tenere traccia del numero di agenti che falliscono a causa della mancanza di conoscenza
+  morti_conoscenza_2007 morti_conoscenza_2008 morti_conoscenza_2009 morti_conoscenza_2010 morti_conoscenza_2012 morti_conoscenza_2013 morti_conoscenza_2011
+  morti_conoscenza_2014 morti_conoscenza_2015 morti_conoscenza_2016
 ]
 
 ;; DEFINIZIONE AGENTI E ATTRIBUTI AGENTI
@@ -248,11 +254,15 @@ to go
   ]
   
   if(time = 2)
-  [ aggiorna_kw_annui ]
+  [ 
+    aggiorna_kw_annui
+    aggiorna_diffusione_conoscenza  ;; ogni il livello di diffusione della conoscenza relativa al fotovoltaico cambia    
+  ]
   
   if (anno = 2014);ora non creo più nulla faccio solo evolvere
   [
     calcola_rapporto
+    if count_pf = 0 [ set count_pf 1 ] ;; non crea problemi di divisione per zero nel caso di simulazioni dove nessun agente riesce a installare impianti
     set percreg precision ((totreg / count_pf) * 100) 2
   ]
   if (anno = 2013 + durata_impianti + 1   and time = 2 );fine simulazione
@@ -275,9 +285,9 @@ to go
     ;;write_pl_file
     
     ;; scrivo su file i risultati relativi ai kW installati ogni anno con i diversi Conti Energia
-    ;write_kW_CE_file
+    write_kW_CE_file
     ;; scrivo su file i risultati relativi al numero di impianti installati ogni anno con i diversi Conti Energia
-    ;write_count_pf_CE_file
+    write_count_pf_CE_file
     
         
    ;;resetta alcune variabili per non avere probemi con simulazioni successive
@@ -311,7 +321,7 @@ to default
   
   set Irradiazione_media_annua_kwh_kwp 1350 
   set Tecnologia_Pannello  "Monocristallini" 
-  set Costo_Medio_kwP 4300 
+  set Costo_Medio_kwP 3500
   set Tasso_lordo_rendimento_BOT 2.147
   set variazione_annuale_prezzi_elettricita 1.8 
   set prezzi_minimi_gsef1 0.103 
@@ -417,9 +427,11 @@ to reset_var
 ;  set costo_kwh_fascia4 0.246
 ;  set costo_kwh_fascia5 0.276
   
+  set percentuale_conoscenza_PV Diffusione_Conoscenza_Iniziale
+  
   set Irradiazione_media_annua_kwh_kwp 1350 
-  set Tecnologia_Pannello  "Monocristallini" 
-  set Costo_Medio_kwP 4300 
+  ;set Tecnologia_Pannello  "Monocristallini" 
+  set Costo_Medio_kwP 3500 
   set Tasso_lordo_rendimento_BOT 2.147
   set variazione_annuale_prezzi_elettricita 1.8 
   set Riduzione_anno_%costo_pannello 3
@@ -592,10 +604,22 @@ to set_global
   set count_pf_6FP_2012 0
   set count_pf_6FP_2013 0
   
+  set morti_conoscenza_2007 0
+  set morti_conoscenza_2008 0
+  set morti_conoscenza_2009 0
+  set morti_conoscenza_2010 0
+  set morti_conoscenza_2011 0
+  set morti_conoscenza_2012 0
+  set morti_conoscenza_2013 0
+  set morti_conoscenza_2014 0
+  set morti_conoscenza_2015 0
+  set morti_conoscenza_2016 0
+  
   set kw_sum 0
   set kw_installed_semester 0
   
   set roe_minimo ROE_minimo_desiderato
+  set percentuale_conoscenza_PV Diffusione_Conoscenza_Iniziale
   
   set NAgentiFINAL NumeroAgenti;quanti crearne per semestre
   
@@ -612,7 +636,7 @@ to set_global
       set m2Kwp 13
     ]
   ]  
-  set Costo_Medio_kwP 3500
+  ;set Costo_Medio_kwP 3500
   
   ;genera_random  ;; genera impianti di tutte le dimensioni
   genera_random_impianti_piccoli  ;; genera esclusivamente impianti di dimensione minore - fascia 1,2 e 3
@@ -819,15 +843,23 @@ to create_pf
         ;;output-print  (word   "DEBUG PRIMA DELLA VALUTAZIONE FATTIBILITÀ") 
         ;;output-print  (word   "------------>>> AGENTE " id  " M2 Disponibili " M2Disposizione " Budget " budget " Consumo Annuale " consumo_medio_annuale) 
         
-        ;; valutazione fattibilità impianto versione iniziale (Croce+Cerri)
-        valuta_fattibilita_impianto;se farà l'impianto con gli incentivi regionali o no??
-        if morto = true;se la valutazione con gli incentivi non mi conviene provo senza incentivi
-        [         
-          ripristina
-          set valutaincentivi false
-          valuta_fattibilita_impianto;valuto di fare l'inpianto senza considerare gli incentivi 
+        ;; la valuatazione della fattibilità dell'impianto avviense solamente se l'agente è a conoscenza delle possibilità offerte dal PV --> in particolare ogni agente genera
+        ;; un numero casuale e lo confronta con il valore della percentuale di conoscenza
+        let prob_conoscenza random 101
+        ifelse ( prob_conoscenza <= percentuale_conoscenza_PV ) ;; l'agente è a conoscenza
+        [
+          ;; valutazione fattibilità impianto versione iniziale (Croce+Cerri)
+          valuta_fattibilita_impianto;se farà l'impianto con gli incentivi regionali o no??
+          if morto = true;se la valutazione con gli incentivi non mi conviene provo senza incentivi
+          [         
+            ripristina
+            set valutaincentivi false
+            valuta_fattibilita_impianto;valuto di fare l'inpianto senza considerare gli incentivi 
+          ]
         ]
-        
+        [ ;; l'agente non è a conoscenza
+          muori_mancanza_conoscenza
+        ]
         ;stima_roe
         ;; output-print  (word   "------------>>> AGENTE " id  "  Roe stimato per l'investimento: " roe_stimato) 
         ;; output-print  (word   "----DEBUG------------>>> AGENTE " id  "  stima_flusso_cassa_cumulato: " stima_flusso_cassa_cumulato) 
@@ -1170,6 +1202,30 @@ to muori
     if freg = true
     [set totreg totreg - 1]
   ]   
+end
+
+
+;; gli agenti possono terminare anche nel caso non siano a conoscenza delle possibilità offerte dal PV
+to muori_mancanza_conoscenza
+  output-print         ("*************************************************************************************************")
+  output-print  (word   "************** AGENTE " id  "Morte causa diffusione conoscenza**************") 
+  output-print  (word   "DIE")
+  set count_pf count_pf - 1
+        
+  ifelse anno = 2007 [ set totneg2007 totneg2007 + 1  set morti_conoscenza_2007 morti_conoscenza_2007 + 1 ][
+  ifelse anno = 2008 [ set totneg2008 totneg2008 + 1  set morti_conoscenza_2008 morti_conoscenza_2008 + 1 ][
+  ifelse anno = 2009 [ set totneg2009 totneg2009 + 1  set morti_conoscenza_2009 morti_conoscenza_2009 + 1 ][
+  ifelse anno = 2010 [ set totneg2010 totneg2010 + 1  set morti_conoscenza_2010 morti_conoscenza_2010 + 1 ][
+  ifelse anno = 2011 [ set totneg2011 totneg2011 + 1  set morti_conoscenza_2011 morti_conoscenza_2011 + 1 ][
+  ifelse anno = 2012 [ set totneg2012 totneg2012 + 1  set morti_conoscenza_2012 morti_conoscenza_2012 + 1 ][
+  ifelse anno = 2013 [ set totneg2013 totneg2013 + 1  set morti_conoscenza_2013 morti_conoscenza_2013 + 1 ][
+  ifelse anno = 2014 [ set totneg2014 totneg2014 + 1  set morti_conoscenza_2014 morti_conoscenza_2014 + 1 ][
+  ifelse anno = 2015 [ set totneg2015 totneg2015 + 1  set morti_conoscenza_2015 morti_conoscenza_2015 + 1 ][
+  ifelse anno = 2016 [ set totneg2016 totneg2016 + 1  set morti_conoscenza_2016 morti_conoscenza_2016 + 1 ][
+        ;; default case 
+  ]]]]]]]]]]
+  
+  die
 end
 
 ;; raccolta di statistiche per gli impianti che non vengono realizzati a causa del roe insufficiente
@@ -1748,6 +1804,14 @@ end
 to aggiorna_kw_semestre
   set kw_installed_semester kw_sum
   set kw_sum 0
+end
+
+;; modifica ogni anno il grado di diffusione della conoscenza relativa al fotovoltaico
+to aggiorna_diffusione_conoscenza
+;  set percentuale_conoscenza_PV ( percentuale_conoscenza_PV * 2 ) ;; aumento lineare, coefficiente 2
+  set percentuale_conoscenza_PV ( percentuale_conoscenza_PV * 5 ) ;; aumento lineare, coefficiente 5
+;  set percentuale_conoscenza_PV ( percentuale_conoscenza_PV * 19 ) ;; aumento lineare, coefficiente 10
+;  set percentuale_conoscenza_PV ( 1 + percentuale_conoscenza_PV * percentuale_conoscenza_PV ) ;; aumento quadratico
 end
 
 ;; CALCOLA LA PERCENTUALE DI AGENTI CHE DECIDONO DI EFFETTUARE L'IMPIANTO
@@ -2880,7 +2944,7 @@ to update_plot_roe
   let i 0
   let g 0
   let cry 0
-  let count_agenti 0
+  let count_agenti 0 
   output-print      ("****************************************************************************************************")
   output-print ( word "***************************************************DATI ROE*****************************************") 
   while [i <= 6]
@@ -2897,6 +2961,7 @@ to update_plot_roe
       ;; questa funzione non calcola correttamente il roe medio nel caso siano presenti molti agenti che falliscono a causa di un roe insufficiente, inoltre non vengono nemmeno
       ;; considerati i roe degli agenti che falliscono a causa di eccedenze dimensioni/budget --> in genere fornisce comunque una buona approssimazione e in ogni caso i calcoli 
       ;; corretti sono efettuati durante il calcolo del roe stimato medio
+      if (count_agenti = 0) [ set count_agenti 1 ] ;; non crea problemi di divisione per zero nel caso di simulazioni dove nessun agente riesce a installare impianti
       set g precision ( (sum [roe%] of pf with  [anno_realizzazione = 2007 + i ]) / count_agenti ) 3
       set-current-plot "Average_ROE"
       set cry 2007 + i 
@@ -2969,6 +3034,7 @@ to print_simulation_info
       ifelse (2007 + i = 2012) [set count_agenti count_pf2012 + totneg_roe2012 set sum_roe (sum [roe_stimato] of pf with  [anno_realizzazione = 2007 + i ] ) + sum_roe_stimato_morti_2012 ][ 
       ifelse (2007 + i = 2013) [set count_agenti count_pf2013 + totneg_roe2013 set sum_roe (sum [roe_stimato] of pf with  [anno_realizzazione = 2007 + i ] ) + sum_roe_stimato_morti_2013 ][ 
       ]]]]]]]
+      if count_agenti = 0 [ set count_agenti 1 ] ;; non crea problemi di divisione per zero nel caso di simulazioni dove nessun agente riesce a installare impianti
       set avg_roe_stimato precision ( sum_roe / count_agenti ) 3
 ;      set avg_stima_ric_incentivo precision ( (sum [stima_ric_incentivo] of pf with  [anno_realizzazione = 2012 + i ] ) / (NAgentiFINAL * 2 ) ) 3
 ;      set avg_stima_ric_autoconsumo precision ( (sum [stima_ric_autoconsumo] of pf with  [anno_realizzazione = 2012 + i ] ) / (NAgentiFINAL * 2 ) ) 3
@@ -3466,7 +3532,7 @@ Costo_Medio_kwP
 Costo_Medio_kwP
 3000
 5000
-4300
+3500
 50
 1
 euro
@@ -5762,10 +5828,10 @@ morti_FP_6
 11
 
 MONITOR
-543
-1366
-616
-1411
+373
+1368
+446
+1413
 NIL
 rand_FP2
 17
@@ -5773,10 +5839,10 @@ rand_FP2
 11
 
 MONITOR
-543
-1314
-616
-1359
+373
+1316
+446
+1361
 NIL
 rand_FP1
 17
@@ -5784,10 +5850,10 @@ rand_FP1
 11
 
 MONITOR
-541
-1418
-614
-1463
+371
+1420
+444
+1465
 NIL
 rand_FP3
 17
@@ -5795,10 +5861,10 @@ rand_FP3
 11
 
 MONITOR
-541
-1469
-614
-1514
+371
+1471
+444
+1516
 NIL
 rand_FP4
 17
@@ -5806,10 +5872,10 @@ rand_FP4
 11
 
 MONITOR
-540
-1516
-613
-1561
+370
+1518
+443
+1563
 NIL
 rand_FP5
 17
@@ -5817,10 +5883,10 @@ rand_FP5
 11
 
 MONITOR
-541
-1563
-614
-1608
+371
+1565
+444
+1610
 NIL
 rand_FP6
 17
@@ -5935,10 +6001,10 @@ Num. agenti \nmorti per FP
 1
 
 TEXTBOX
-522
-1257
-672
-1302
+352
+1259
+502
+1304
 Generazione agenti random,\n numero per FP
 12
 15.0
@@ -6181,6 +6247,151 @@ I prezzi dell'energia al consumo non sono più selezionabili tramite interfaccia
 12
 24.0
 1
+
+TEXTBOX
+1114
+486
+1264
+520
+Diffusione Conoscenza Iniziale
+14
+112.0
+1
+
+SLIDER
+1105
+532
+1346
+565
+Diffusione_Conoscenza_Iniziale
+Diffusione_Conoscenza_Iniziale
+0
+100
+10
+1
+1
+NIL
+HORIZONTAL
+
+TEXTBOX
+595
+1243
+745
+1273
+Agenti morti causa mancanza conoscenza
+12
+33.0
+1
+
+MONITOR
+489
+1288
+659
+1333
+NIL
+morti_conoscenza_2007
+17
+1
+11
+
+MONITOR
+489
+1340
+659
+1385
+NIL
+morti_conoscenza_2008
+17
+1
+11
+
+MONITOR
+489
+1390
+659
+1435
+NIL
+morti_conoscenza_2009
+17
+1
+11
+
+MONITOR
+488
+1440
+658
+1485
+NIL
+morti_conoscenza_2010
+17
+1
+11
+
+MONITOR
+489
+1491
+659
+1536
+NIL
+morti_conoscenza_2011
+17
+1
+11
+
+MONITOR
+664
+1288
+834
+1333
+NIL
+morti_conoscenza_2012
+17
+1
+11
+
+MONITOR
+664
+1340
+834
+1385
+NIL
+morti_conoscenza_2013
+17
+1
+11
+
+MONITOR
+665
+1391
+835
+1436
+NIL
+morti_conoscenza_2014
+17
+1
+11
+
+MONITOR
+665
+1441
+835
+1486
+NIL
+morti_conoscenza_2015
+17
+1
+11
+
+MONITOR
+667
+1491
+837
+1536
+NIL
+morti_conoscenza_2016
+17
+1
+11
 
 @#$#@#$#@
 ## CREDITS AND REFERENCES
@@ -6499,7 +6710,7 @@ NetLogo 5.0.2
 @#$#@#$#@
 @#$#@#$#@
 <experiments>
-  <experiment name="kW_installed_yearly_CE" repetitions="500" runMetricsEveryStep="false">
+  <experiment name="kW_installed_yearly_CE" repetitions="100" runMetricsEveryStep="false">
     <setup>setup</setup>
     <go>go</go>
     <enumeratedValueSet variable="NumeroAgenti">
@@ -6530,7 +6741,7 @@ NetLogo 5.0.2
       <value value="0"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="Costo_Medio_kwP">
-      <value value="4300"/>
+      <value value="3500"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="Accettato">
       <value value="85"/>
@@ -6572,7 +6783,7 @@ NetLogo 5.0.2
       <value value="2"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="Raggio">
-      <value value="0.1"/>
+      <value value="5"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="InterBanca">
       <value value="5"/>
@@ -6820,6 +7031,334 @@ NetLogo 5.0.2
     </enumeratedValueSet>
     <enumeratedValueSet variable="BudgetRegione2009">
       <value value="0"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="kw_influenza_ROE_minimo" repetitions="100" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <enumeratedValueSet variable="Intorno">
+      <value value="true"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="costo_kwh_fascia4">
+      <value value="0.246"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Tasso_lordo_rendimento_BOT">
+      <value value="2.147"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Tecnologia_Pannello">
+      <value value="&quot;Monocristallini&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="BudgetRegione2016">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="BudgetRegione2011">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="InterBanca">
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="BudgetRegione">
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Irradiazione_media_annua_kwh_kwp">
+      <value value="1350"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Media%_copertura_consumi_richiesta">
+      <value value="70"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="M2_Disposizione">
+      <value value="100"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="LeggiSerieStoriche">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="InfluenzaRate">
+      <value value="40"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="BudgetRegione2013">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="fr">
+      <value value="&quot;Nessuno&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Anni_Restituzione_mutuo_regione">
+      <value value="20"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Riduzione_anno_%costo_pannello">
+      <value value="3"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Incentivi_Dinamici">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Aumento_%annuo_consumi">
+      <value value="0.9"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Consumo_medio_annuale_KWh">
+      <value value="15200"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="%_Variazione_Tariffe">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="InterRegione">
+      <value value="1"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Perdita_efficienza_annuale_pannello">
+      <value value="0.5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="BudgetRegione2014">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="BudgetRegione2010">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="variazione_annuale_prezzi_elettricita">
+      <value value="1.8"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Probfinanz">
+      <value value="90"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="BudgetRegione2015">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Sensibilita">
+      <value value="2"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Manutenzione_anno_%costo_totale">
+      <value value="1.5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="NumeroAgenti">
+      <value value="200"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Anni_Restituzione_Prestiti">
+      <value value="20"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Accettato">
+      <value value="85"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="PercMax">
+      <value value="80"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="ROE_minimo_desiderato">
+      <value value="1"/>
+      <value value="3"/>
+      <value value="5"/>
+      <value value="7"/>
+      <value value="10"/>
+      <value value="12"/>
+      <value value="14"/>
+      <value value="15"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="%_Incentivi_Installazione">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="FallimentoMutuo">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Costo_Medio_kwP">
+      <value value="4300"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Incentivi_Installazione">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Varia_Tariffe_Incetivanti">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="costo_kwh_fascia2">
+      <value value="0.162"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="costo_kwh_fascia5">
+      <value value="0.276"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Percentuale_Interessi_Prestito">
+      <value value="4.3"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="BudgetRegione2009">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="PercMin">
+      <value value="20"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="costo_kwh_fascia3">
+      <value value="0.194"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Budget_Medio_MiliaiaEuro">
+      <value value="100"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Anni_Restituzione_mutuo_banca">
+      <value value="20"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="costo_kwh_fascia1">
+      <value value="0.278"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Raggio">
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="BudgetRegione2008">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="BudgetRegione2012">
+      <value value="0"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="kw_installati_conoscenza" repetitions="100" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <enumeratedValueSet variable="Incentivi_Dinamici">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="BudgetRegione2012">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="costo_kwh_fascia2">
+      <value value="0.162"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="BudgetRegione2014">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <steppedValueSet variable="Diffusione_Conoscenza_Iniziale" first="1" step="1" last="10"/>
+    <enumeratedValueSet variable="Costo_Medio_kwP">
+      <value value="3500"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="BudgetRegione2010">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Probfinanz">
+      <value value="90"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="%_Incentivi_Installazione">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="BudgetRegione2013">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="%_Variazione_Tariffe">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Sensibilita">
+      <value value="2"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="costo_kwh_fascia4">
+      <value value="0.246"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="costo_kwh_fascia1">
+      <value value="0.278"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Anni_Restituzione_mutuo_regione">
+      <value value="20"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="BudgetRegione2011">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Perdita_efficienza_annuale_pannello">
+      <value value="0.5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Anni_Restituzione_Prestiti">
+      <value value="20"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Raggio">
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Aumento_%annuo_consumi">
+      <value value="0.9"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="fr">
+      <value value="&quot;Nessuno&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="PercMax">
+      <value value="80"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="costo_kwh_fascia3">
+      <value value="0.194"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Incentivi_Installazione">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Consumo_medio_annuale_KWh">
+      <value value="15200"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Intorno">
+      <value value="true"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Tasso_lordo_rendimento_BOT">
+      <value value="2.147"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Riduzione_anno_%costo_pannello">
+      <value value="3"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Irradiazione_media_annua_kwh_kwp">
+      <value value="1350"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="InterRegione">
+      <value value="1"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="InfluenzaRate">
+      <value value="40"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="ROE_minimo_desiderato">
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="FallimentoMutuo">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="M2_Disposizione">
+      <value value="100"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="BudgetRegione2008">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="InterBanca">
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="BudgetRegione2015">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Manutenzione_anno_%costo_totale">
+      <value value="1.5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Budget_Medio_MiliaiaEuro">
+      <value value="100"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="LeggiSerieStoriche">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Accettato">
+      <value value="85"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="BudgetRegione2009">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Tecnologia_Pannello">
+      <value value="&quot;Monocristallini&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Percentuale_Interessi_Prestito">
+      <value value="4.3"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Varia_Tariffe_Incetivanti">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="BudgetRegione">
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Anni_Restituzione_mutuo_banca">
+      <value value="20"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="NumeroAgenti">
+      <value value="200"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="variazione_annuale_prezzi_elettricita">
+      <value value="1.8"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="costo_kwh_fascia5">
+      <value value="0.276"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="BudgetRegione2016">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="PercMin">
+      <value value="20"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Media%_copertura_consumi_richiesta">
+      <value value="70"/>
     </enumeratedValueSet>
   </experiment>
 </experiments>

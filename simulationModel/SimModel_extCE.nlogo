@@ -1809,9 +1809,10 @@ end
 ;; modifica ogni anno il grado di diffusione della conoscenza relativa al fotovoltaico
 to aggiorna_diffusione_conoscenza
 ;  set percentuale_conoscenza_PV ( percentuale_conoscenza_PV * 2 ) ;; aumento lineare, coefficiente 2
-  set percentuale_conoscenza_PV ( percentuale_conoscenza_PV * 5 ) ;; aumento lineare, coefficiente 5
+;  set percentuale_conoscenza_PV ( percentuale_conoscenza_PV * 5 ) ;; aumento lineare, coefficiente 5
 ;  set percentuale_conoscenza_PV ( percentuale_conoscenza_PV * 19 ) ;; aumento lineare, coefficiente 10
 ;  set percentuale_conoscenza_PV ( 1 + percentuale_conoscenza_PV * percentuale_conoscenza_PV ) ;; aumento quadratico
+  set percentuale_conoscenza_PV ( 1 + percentuale_conoscenza_PV * percentuale_conoscenza_PV * percentuale_conoscenza_PV ) ;; aumento cubico
 end
 
 ;; CALCOLA LA PERCENTUALE DI AGENTI CHE DECIDONO DI EFFETTUARE L'IMPIANTO

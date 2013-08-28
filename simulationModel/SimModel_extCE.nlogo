@@ -102,6 +102,8 @@ globals [ wacc m2Kwp  count_tick scala_dim_impianto time anno number durata_impi
   ;; variabili per simulare il grado di diffusione della conoscenza della tecnologia e incentivi PV --> se gli agenti non sanno che esiste la possibilità o la convenienza di installare
   ;; un impianto non prendono nemmeno in considerazione l'idea
   percentuale_conoscenza_PV  ;; la percentuale di agenti che ogni anno è a conoscenza delle possibilità offerte dal PV: il valore è inizialmente settato tramite interfaccia grafica
+  ; Tipo_variazione_conoscenza_PV variabile globale settabile da interfaccia che indca come cambia annualmente la percentuale di conoscenza, aumento lineare, quadratico o cubico
+  coeff_variazione_conoscenza_PV  ;; coefficiente che esprime quanto velocemente cambia la conoscenza ogni anno
   ;; variabili per tenere traccia del numero di agenti che falliscono a causa della mancanza di conoscenza
   morti_conoscenza_2007 morti_conoscenza_2008 morti_conoscenza_2009 morti_conoscenza_2010 morti_conoscenza_2012 morti_conoscenza_2013 morti_conoscenza_2011
   morti_conoscenza_2014 morti_conoscenza_2015 morti_conoscenza_2016
@@ -153,12 +155,6 @@ pf-own [id consumo_medio_annuale budget %cop_cosumi M2disposizione dimensione_im
   flag_roe ;variabile per tenere traccia degli agenti che non installano a causa di roe insufficiente e non per problemi di eccedenza costi, etc.
   flag_sum_roe_morti
   flag_sum_roe_stimato_morti
-  
-  ;; ogni agente - in particolare modo i singoli cittadini - oltre a decidere se installare o meno un pf in base a considerazioni di natura economica 
-  ;; (fattibilità impianto e roe stimato) o sociale (ostinazione personale interazione sociale) potrebbe essere influenzato nella sua decisione anche in maniera negativa, 
-  ;; come ad esempio difficoltà burocratica percepita, mancanza di informazioni, mancanza di volontà per affrontare spese e incombenze necessarie ad avviare il progetto 
-  ;; (reali o percepite)  ---> tutti questi fattori potrebbero influenzare in maniera negativa la scelta   
-  resistenza_investimento
   
 ]
  
@@ -267,7 +263,6 @@ to go
   ]
   if (anno = 2013 + durata_impianti + 1   and time = 2 );fine simulazione
   [ 
-    ;; update_plot_roe
     aggiorna_incentivi_prod
     aggiorna_incentivi_tot
     ; stampa_agenti  ;; commentato per non appesantire output, usare in fase di debug
@@ -619,7 +614,9 @@ to set_global
   set kw_installed_semester 0
   
   set roe_minimo ROE_minimo_desiderato
+  
   set percentuale_conoscenza_PV Diffusione_Conoscenza_Iniziale
+  set coeff_variazione_conoscenza_PV Coeff_Variazione_Diffusione
   
   set NAgentiFINAL NumeroAgenti;quanti crearne per semestre
   
@@ -1088,7 +1085,7 @@ to valuta_fattibilita_impianto
           aggiorna_incentivi_installazione
           aggiorna_budget_annuale
           aggiorna_pf
-          ;stampa
+          stampa
       ]
       [  ;; impianto non realizzato
         output-print   ("*************************************************************************************************")
@@ -1808,11 +1805,24 @@ end
 
 ;; modifica ogni anno il grado di diffusione della conoscenza relativa al fotovoltaico
 to aggiorna_diffusione_conoscenza
+  ;; versione iniziale, tipo varazione cablato nel codice
 ;  set percentuale_conoscenza_PV ( percentuale_conoscenza_PV * 2 ) ;; aumento lineare, coefficiente 2
 ;  set percentuale_conoscenza_PV ( percentuale_conoscenza_PV * 5 ) ;; aumento lineare, coefficiente 5
 ;  set percentuale_conoscenza_PV ( percentuale_conoscenza_PV * 19 ) ;; aumento lineare, coefficiente 10
 ;  set percentuale_conoscenza_PV ( 1 + percentuale_conoscenza_PV * percentuale_conoscenza_PV ) ;; aumento quadratico
-  set percentuale_conoscenza_PV ( 1 + percentuale_conoscenza_PV * percentuale_conoscenza_PV * percentuale_conoscenza_PV ) ;; aumento cubico
+;  set percentuale_conoscenza_PV ( 1 + percentuale_conoscenza_PV * percentuale_conoscenza_PV * percentuale_conoscenza_PV ) ;; aumento cubico
+
+  ;; nuova versione
+  ifelse (Tipo_variazione_conoscenza_PV = "Lineare") [ 
+    set percentuale_conoscenza_PV ( percentuale_conoscenza_PV * coeff_variazione_conoscenza_PV ) ][
+  ifelse (Tipo_variazione_conoscenza_PV = "Quadratico") [ 
+    ifelse (percentuale_conoscenza_PV = 1) [ set percentuale_conoscenza_PV ( 1 + percentuale_conoscenza_PV * percentuale_conoscenza_PV ) ]
+    [ set percentuale_conoscenza_PV ( percentuale_conoscenza_PV * percentuale_conoscenza_PV * coeff_variazione_conoscenza_PV )] ][
+  ifelse (Tipo_variazione_conoscenza_PV = "Cubico") [ 
+    ifelse (percentuale_conoscenza_PV = 1) [ set percentuale_conoscenza_PV ( 1 + percentuale_conoscenza_PV * percentuale_conoscenza_PV * percentuale_conoscenza_PV ) ]
+    [ set percentuale_conoscenza_PV ( percentuale_conoscenza_PV * percentuale_conoscenza_PV * percentuale_conoscenza_PV * coeff_variazione_conoscenza_PV )] ][
+      ;; default case 
+    ]]]
 end
 
 ;; CALCOLA LA PERCENTUALE DI AGENTI CHE DECIDONO DI EFFETTUARE L'IMPIANTO
@@ -6268,7 +6278,7 @@ Diffusione_Conoscenza_Iniziale
 Diffusione_Conoscenza_Iniziale
 0
 100
-10
+1
 1
 1
 NIL
@@ -6393,6 +6403,31 @@ morti_conoscenza_2016
 17
 1
 11
+
+CHOOSER
+1106
+572
+1347
+617
+Tipo_variazione_conoscenza_PV
+Tipo_variazione_conoscenza_PV
+"Lineare" "Quadratico" "Cubico"
+1
+
+SLIDER
+1106
+621
+1348
+654
+Coeff_Variazione_Diffusione
+Coeff_Variazione_Diffusione
+1
+10
+1
+0.1
+1
+NIL
+HORIZONTAL
 
 @#$#@#$#@
 ## CREDITS AND REFERENCES
@@ -7204,78 +7239,50 @@ NetLogo 5.0.2
   <experiment name="kw_installati_conoscenza" repetitions="100" runMetricsEveryStep="false">
     <setup>setup</setup>
     <go>go</go>
-    <enumeratedValueSet variable="Incentivi_Dinamici">
-      <value value="false"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="BudgetRegione2012">
-      <value value="0"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="costo_kwh_fascia2">
-      <value value="0.162"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="BudgetRegione2014">
-      <value value="0"/>
-    </enumeratedValueSet>
-    <steppedValueSet variable="Diffusione_Conoscenza_Iniziale" first="1" step="1" last="10"/>
     <enumeratedValueSet variable="Costo_Medio_kwP">
       <value value="3500"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="BudgetRegione2010">
-      <value value="0"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="Probfinanz">
-      <value value="90"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="%_Incentivi_Installazione">
-      <value value="10"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="BudgetRegione2013">
-      <value value="0"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="%_Variazione_Tariffe">
-      <value value="0"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="Sensibilita">
-      <value value="2"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="costo_kwh_fascia4">
-      <value value="0.246"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="costo_kwh_fascia1">
-      <value value="0.278"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="Anni_Restituzione_mutuo_regione">
-      <value value="20"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="BudgetRegione2011">
-      <value value="0"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="Perdita_efficienza_annuale_pannello">
-      <value value="0.5"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="Anni_Restituzione_Prestiti">
-      <value value="20"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="Raggio">
       <value value="5"/>
     </enumeratedValueSet>
-    <enumeratedValueSet variable="Aumento_%annuo_consumi">
-      <value value="0.9"/>
+    <enumeratedValueSet variable="Media%_copertura_consumi_richiesta">
+      <value value="70"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="%_Incentivi_Installazione">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Diffusione_Conoscenza_Iniziale">
+      <value value="1"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="%_Variazione_Tariffe">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="BudgetRegione">
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Sensibilita">
+      <value value="2"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="BudgetRegione2008">
+      <value value="0"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="fr">
       <value value="&quot;Nessuno&quot;"/>
     </enumeratedValueSet>
-    <enumeratedValueSet variable="PercMax">
-      <value value="80"/>
+    <enumeratedValueSet variable="InterBanca">
+      <value value="5"/>
     </enumeratedValueSet>
-    <enumeratedValueSet variable="costo_kwh_fascia3">
-      <value value="0.194"/>
+    <enumeratedValueSet variable="Accettato">
+      <value value="85"/>
     </enumeratedValueSet>
-    <enumeratedValueSet variable="Incentivi_Installazione">
-      <value value="false"/>
+    <enumeratedValueSet variable="M2_Disposizione">
+      <value value="100"/>
     </enumeratedValueSet>
-    <enumeratedValueSet variable="Consumo_medio_annuale_KWh">
-      <value value="15200"/>
+    <enumeratedValueSet variable="Tecnologia_Pannello">
+      <value value="&quot;Monocristallini&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="variazione_annuale_prezzi_elettricita">
+      <value value="1.8"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="Intorno">
       <value value="true"/>
@@ -7283,83 +7290,117 @@ NetLogo 5.0.2
     <enumeratedValueSet variable="Tasso_lordo_rendimento_BOT">
       <value value="2.147"/>
     </enumeratedValueSet>
-    <enumeratedValueSet variable="Riduzione_anno_%costo_pannello">
-      <value value="3"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="Irradiazione_media_annua_kwh_kwp">
-      <value value="1350"/>
+    <enumeratedValueSet variable="BudgetRegione2011">
+      <value value="0"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="InterRegione">
       <value value="1"/>
     </enumeratedValueSet>
-    <enumeratedValueSet variable="InfluenzaRate">
-      <value value="40"/>
+    <enumeratedValueSet variable="Tipo_variazione_conoscenza_PV">
+      <value value="&quot;Cubico&quot;"/>
     </enumeratedValueSet>
-    <enumeratedValueSet variable="ROE_minimo_desiderato">
-      <value value="5"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="FallimentoMutuo">
-      <value value="10"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="M2_Disposizione">
-      <value value="100"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="BudgetRegione2008">
+    <enumeratedValueSet variable="BudgetRegione2012">
       <value value="0"/>
     </enumeratedValueSet>
-    <enumeratedValueSet variable="InterBanca">
-      <value value="5"/>
+    <enumeratedValueSet variable="costo_kwh_fascia3">
+      <value value="0.194"/>
     </enumeratedValueSet>
-    <enumeratedValueSet variable="BudgetRegione2015">
+    <enumeratedValueSet variable="Anni_Restituzione_mutuo_regione">
+      <value value="20"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Incentivi_Installazione">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="BudgetRegione2013">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="costo_kwh_fascia5">
+      <value value="0.276"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Percentuale_Interessi_Prestito">
+      <value value="4.3"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="LeggiSerieStoriche">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="BudgetRegione2014">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <steppedValueSet variable="Coeff_Variazione_Diffusione" first="1" step="0.5" last="5.5"/>
+    <enumeratedValueSet variable="BudgetRegione2010">
       <value value="0"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="Manutenzione_anno_%costo_totale">
       <value value="1.5"/>
     </enumeratedValueSet>
+    <enumeratedValueSet variable="PercMin">
+      <value value="20"/>
+    </enumeratedValueSet>
     <enumeratedValueSet variable="Budget_Medio_MiliaiaEuro">
       <value value="100"/>
     </enumeratedValueSet>
-    <enumeratedValueSet variable="LeggiSerieStoriche">
-      <value value="false"/>
+    <enumeratedValueSet variable="Perdita_efficienza_annuale_pannello">
+      <value value="0.5"/>
     </enumeratedValueSet>
-    <enumeratedValueSet variable="Accettato">
-      <value value="85"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="BudgetRegione2009">
-      <value value="0"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="Tecnologia_Pannello">
-      <value value="&quot;Monocristallini&quot;"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="Percentuale_Interessi_Prestito">
-      <value value="4.3"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="Varia_Tariffe_Incetivanti">
-      <value value="false"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="BudgetRegione">
-      <value value="5"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="Anni_Restituzione_mutuo_banca">
+    <enumeratedValueSet variable="Anni_Restituzione_Prestiti">
       <value value="20"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="costo_kwh_fascia4">
+      <value value="0.246"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="PercMax">
+      <value value="80"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Consumo_medio_annuale_KWh">
+      <value value="15200"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="InfluenzaRate">
+      <value value="40"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="BudgetRegione2015">
+      <value value="0"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="NumeroAgenti">
       <value value="200"/>
     </enumeratedValueSet>
-    <enumeratedValueSet variable="variazione_annuale_prezzi_elettricita">
-      <value value="1.8"/>
+    <enumeratedValueSet variable="ROE_minimo_desiderato">
+      <value value="5"/>
     </enumeratedValueSet>
-    <enumeratedValueSet variable="costo_kwh_fascia5">
-      <value value="0.276"/>
+    <enumeratedValueSet variable="Riduzione_anno_%costo_pannello">
+      <value value="3"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="FallimentoMutuo">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Incentivi_Dinamici">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Probfinanz">
+      <value value="90"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Anni_Restituzione_mutuo_banca">
+      <value value="20"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Varia_Tariffe_Incetivanti">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="costo_kwh_fascia2">
+      <value value="0.162"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="BudgetRegione2009">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Aumento_%annuo_consumi">
+      <value value="0.9"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Irradiazione_media_annua_kwh_kwp">
+      <value value="1350"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="costo_kwh_fascia1">
+      <value value="0.278"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="BudgetRegione2016">
       <value value="0"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="PercMin">
-      <value value="20"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="Media%_copertura_consumi_richiesta">
-      <value value="70"/>
     </enumeratedValueSet>
   </experiment>
 </experiments>

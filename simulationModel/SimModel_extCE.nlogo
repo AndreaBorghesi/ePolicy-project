@@ -276,6 +276,9 @@ to go
     output-print (word "--------------------------------------------------------------------------------------------------------------------------------------------------------")
     export-output (word "Output/Simulazione "random 10000 " con agenti " NumeroAgenti" Variazione Incentivi produzione "Varia_Tariffe_Incetivanti " Percentuale " %_Variazione_Tariffe" Incentivi_Installazione " Incentivi_Installazione".txt")
     
+    ;; output per testare lettura di esperimento da file xml
+    output-print (word "Raggio interazione: " Raggio " ---- Sensibilità interazione: " Sensibilita)
+    
     ;;produco file utile per l'ottimizzatore
     ;;write_pl_file
     
@@ -283,7 +286,6 @@ to go
     write_kW_CE_file
     ;; scrivo su file i risultati relativi al numero di impianti installati ogni anno con i diversi Conti Energia
     write_count_pf_CE_file
-    
         
    ;;resetta alcune variabili per non avere probemi con simulazioni successive
    reset_var
@@ -3386,18 +3388,19 @@ end
 to write_kW_CE_file
   file-open "/media/sda4/ePolicy/simulationModel/output/kW_CE.csv"
   ;; i valori presenti in ogni riga sono: kW 2007, kW 2008, kW 2009, kW 2010, kW 2011, kW 2012, kW 2013,
-  ;; file-print (word kW2007 ", " kW2008 ", " kW2009 ", " kW2010 ", " kW2011 ", " kW2012 ", " kW2013)
+  file-print (word kW2007 ", " kW2008 ", " kW2009 ", " kW2010 ", " kW2011 ", " kW2012 ", " kW2013)
   
   ;; ora stampo i kw annuali divisi per classe di potenza (fasce potenza 1,2,3)
 ;  file-print (word kW_1FP_2007 ", " kW_1FP_2008 ", " kW_1FP_2009 ", " kW_1FP_2010 ", " kW_1FP_2011 ", " kW_1FP_2012 ", " kW_1FP_2013 ", "
 ;    kW_2FP_2007 ", " kW_2FP_2008 ", " kW_2FP_2009 ", " kW_2FP_2010 ", " kW_2FP_2011 ", " kW_2FP_2012 ", " kW_2FP_2013 ", "
 ;    kW_3FP_2007 ", " kW_3FP_2008 ", " kW_3FP_2009 ", " kW_3FP_2010 ", " kW_3FP_2011 ", " kW_3FP_2012 ", " kW_3FP_2013 )
   
-  file-print (word kW_1FP_2007 ", " kW_1FP_2008 ", " kW_1FP_2009 ", " kW_1FP_2010 ", " kW_1FP_2011 ", " kW_1FP_2012 ", " kW_1FP_2013 ", "
-    kW_2FP_2007 ", " kW_2FP_2008 ", " kW_2FP_2009 ", " kW_2FP_2010 ", " kW_2FP_2011 ", " kW_2FP_2012 ", " kW_2FP_2013 ", "
-    kW_3FP_2007 ", " kW_3FP_2008 ", " kW_3FP_2009 ", " kW_3FP_2010 ", " kW_3FP_2011 ", " kW_3FP_2012 ", " kW_3FP_2013 ", "
-    kW2007 ", " kW2008 ", " kW2009 ", " kW2010 ", " kW2011 ", " kW2012 ", " kW2013 )
-  
+  ;; stampo i kw annuali divisi per classe di potenza (fasce potenza 1,2,3) e i kw annuali cumulativi
+;  file-print (word kW_1FP_2007 ", " kW_1FP_2008 ", " kW_1FP_2009 ", " kW_1FP_2010 ", " kW_1FP_2011 ", " kW_1FP_2012 ", " kW_1FP_2013 ", "
+;    kW_2FP_2007 ", " kW_2FP_2008 ", " kW_2FP_2009 ", " kW_2FP_2010 ", " kW_2FP_2011 ", " kW_2FP_2012 ", " kW_2FP_2013 ", "
+;    kW_3FP_2007 ", " kW_3FP_2008 ", " kW_3FP_2009 ", " kW_3FP_2010 ", " kW_3FP_2011 ", " kW_3FP_2012 ", " kW_3FP_2013 ", "
+;    kW2007 ", " kW2008 ", " kW2009 ", " kW2010 ", " kW2011 ", " kW2012 ", " kW2013 )
+;  
   file-close
   
 end
@@ -7401,6 +7404,175 @@ NetLogo 5.0.2
     </enumeratedValueSet>
     <enumeratedValueSet variable="BudgetRegione2016">
       <value value="0"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="simple_run" repetitions="1" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <enumeratedValueSet variable="Riduzione_anno_%costo_pannello">
+      <value value="3"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Raggio">
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Tipo_variazione_conoscenza_PV">
+      <value value="&quot;Quadratico&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Anni_Restituzione_mutuo_banca">
+      <value value="20"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="BudgetRegione2008">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Tasso_lordo_rendimento_BOT">
+      <value value="2.147"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="BudgetRegione">
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Intorno">
+      <value value="true"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="BudgetRegione2009">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="fr">
+      <value value="&quot;Nessuno&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Anni_Restituzione_mutuo_regione">
+      <value value="20"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Tecnologia_Pannello">
+      <value value="&quot;Monocristallini&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="FallimentoMutuo">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Consumo_medio_annuale_KWh">
+      <value value="15200"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="variazione_annuale_prezzi_elettricita">
+      <value value="1.8"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="BudgetRegione2014">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="BudgetRegione2016">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="BudgetRegione2011">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="BudgetRegione2015">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="NumeroAgenti">
+      <value value="200"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Budget_Medio_MiliaiaEuro">
+      <value value="100"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="%_Incentivi_Installazione">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Probfinanz">
+      <value value="90"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="costo_kwh_fascia1">
+      <value value="0.278"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Aumento_%annuo_consumi">
+      <value value="0.9"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="%_Variazione_Tariffe">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="PercMin">
+      <value value="20"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="M2_Disposizione">
+      <value value="100"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Anni_Restituzione_Prestiti">
+      <value value="20"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="costo_kwh_fascia4">
+      <value value="0.246"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="ROE_minimo_desiderato">
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Perdita_efficienza_annuale_pannello">
+      <value value="0.5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="BudgetRegione2013">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="costo_kwh_fascia2">
+      <value value="0.162"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Accettato">
+      <value value="85"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="BudgetRegione2012">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Sensibilita">
+      <value value="2"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Varia_Tariffe_Incetivanti">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Irradiazione_media_annua_kwh_kwp">
+      <value value="1350"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="InfluenzaRate">
+      <value value="40"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Diffusione_Conoscenza_Iniziale">
+      <value value="1"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="costo_kwh_fascia5">
+      <value value="0.276"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Incentivi_Dinamici">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Incentivi_Installazione">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="InterBanca">
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="LeggiSerieStoriche">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Coeff_Variazione_Diffusione">
+      <value value="1"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="costo_kwh_fascia3">
+      <value value="0.194"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Manutenzione_anno_%costo_totale">
+      <value value="1.5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="BudgetRegione2010">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Media%_copertura_consumi_richiesta">
+      <value value="70"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Costo_Medio_kwP">
+      <value value="3500"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="PercMax">
+      <value value="80"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="Percentuale_Interessi_Prestito">
+      <value value="4.3"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="InterRegione">
+      <value value="1"/>
     </enumeratedValueSet>
   </experiment>
 </experiments>

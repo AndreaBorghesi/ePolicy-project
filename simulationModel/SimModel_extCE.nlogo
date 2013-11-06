@@ -410,7 +410,7 @@ to default
   set r2010 0
   set r2011 0
   set LeggiSerieStoriche true
-  set fr "Nessuno"
+  set Tipo_inc_reg "Nessuno"
   clear-output
 end
 
@@ -961,7 +961,7 @@ to genera_pf
   let p random 101;vorrà essere finanziato??
   if p < ProbFinanz;mi faccio finanziare
     [       
-      ifelse fr = "Asta";la regione paga una percentuale a chi la chiede finchè ha dei soldi
+      ifelse Tipo_inc_reg = "Asta";la regione paga una percentuale a chi la chiede finchè ha dei soldi
         [                     
           ;calcolo percentuale
           set pfin PercMin + random (PercMax - PercMin + 1);percentuale richiesta da 10 a 50
@@ -978,7 +978,7 @@ to genera_pf
         ]
         [
           let ra random 101;per vedere se la banca accetta
-          ifelse fr = "Conto interessi" and ra < Accettato;la regione paga gli interessi dei mutui, l'agente paga la stessa cifra, ma a rate
+          ifelse Tipo_inc_reg = "Conto interessi" and ra < Accettato;la regione paga gli interessi dei mutui, l'agente paga la stessa cifra, ma a rate
           [            
             set %ostinazione %ostinazione +  InfluenzaRate ;se pago a rate sono più interessato
             set iregg (costo_impianto * InterBanca / 100 );quanto sborsa la regione
@@ -995,7 +995,7 @@ to genera_pf
             ]
           ]
           [ 
-            ifelse fr ="Rotazione";il mututo lo fa la regione, ma con tassi di interesse più leggeri.
+            ifelse Tipo_inc_reg ="Rotazione";il mututo lo fa la regione, ma con tassi di interesse più leggeri.
             [             
               
               set %ostinazione %ostinazione +  InfluenzaRate ;se pago a rate sono più interessato              
@@ -1014,7 +1014,7 @@ to genera_pf
               ]
             ]
             [ 
-              if fr = "Garanzia";la regione da la garanzia alle banche sugli agenti, sicchè la banca non esclude dal mutuo nessun agente
+              if Tipo_inc_reg = "Garanzia";la regione da la garanzia alle banche sugli agenti, sicchè la banca non esclude dal mutuo nessun agente
               [                
                 set %ostinazione %ostinazione +  InfluenzaRate;se pago a rate sono più interessato                
                 set ifin (costo_impianto * InterBanca / 100 )*( -1);quanto pago di interessi alla banca
@@ -1156,22 +1156,22 @@ end
 to muori
   if freg = true and valutaincentivi = true
     [     
-      ifelse fr = "Asta"
+      ifelse Tipo_inc_reg = "Asta"
         [
           set BudgetCorrente BudgetCorrente + ifin;ripristino situazione precedente
         ]
         [
-          ifelse fr = "Conto interessi"
+          ifelse Tipo_inc_reg = "Conto interessi"
             [
               set BudgetCorrente BudgetCorrente + iregg
             ]     
             [
-              ifelse fr = "Rotazione"
+              ifelse Tipo_inc_reg = "Rotazione"
                 [
                   set BudgetCorrente BudgetCorrente + costo_impianto  
                 ]
                 [
-                  if fr ="Garanzia" and fallito
+                  if Tipo_inc_reg ="Garanzia" and fallito
                   [
                     set BudgetCorrente BudgetCorrente + costo_impianto + guadagnobanca;
                   ]
@@ -2486,12 +2486,12 @@ to aggiorna_ricavi
   ask pf
   [
     ;pago la regione
-    if fr ="Rotazione" and ratepagate < Anni_Restituzione_mutuo_regione and  freg = true
+    if Tipo_inc_reg ="Rotazione" and ratepagate < Anni_Restituzione_mutuo_regione and  freg = true
     [
       set BudgetCorrente  BudgetCorrente + rataReg;restituisco soldi alla regione
       set ratepagate ratepagate + 1
     ]   
-    if fr ="Garanzia" and ratepagate < Anni_Restituzione_mutuo_banca and  freg = true
+    if Tipo_inc_reg ="Garanzia" and ratepagate < Anni_Restituzione_mutuo_banca and  freg = true
     [    
       set ratepagate ratepagate + 1
     ]    
@@ -3377,7 +3377,7 @@ to write_pl_file
   
   ;;versione iniziale che produce risultati relativi principalmente a tipo di incentivo, buget PV, spesa per PV e produzione finale
   ;;file-print (word "result_new('"fr"'," INCENTIVO_INSTOT ", " %_Incentivi_Installazione ", " TOT_SPESA ","BudgetRegione","BudgetCorrente"," kWTOT").")
-  file-print (word "result_new('"fr"'," INCENTIVO_INSTOT ", " %_Incentivi_Installazione ", " TOT_SPESA ","BudgetRegione","Budget2017"," kWTOT").")
+  file-print (word "result_new('"Tipo_inc_reg"'," INCENTIVO_INSTOT ", " %_Incentivi_Installazione ", " TOT_SPESA ","BudgetRegione","Budget2017"," kWTOT").")
   
   ;;seconda versione necessaria per considerare anche l'interazione sociale
   ;;file-print (word "result_new('"fr"'," INCENTIVO_INSTOT ", " %_Incentivi_Installazione ", " TOT_SPESA ","BudgetRegione","BudgetCorrente"," kWTOT"," Raggio","Sensibilita ").")
@@ -4344,8 +4344,8 @@ CHOOSER
 798
 154
 843
-fr
-fr
+Tipo_inc_reg
+Tipo_inc_reg
 "Nessuno" "Asta" "Conto interessi" "Rotazione" "Garanzia"
 0
 
@@ -6842,7 +6842,7 @@ NetLogo 5.0.2
     <enumeratedValueSet variable="costo_kwh_fascia5">
       <value value="0.276"/>
     </enumeratedValueSet>
-    <enumeratedValueSet variable="fr">
+    <enumeratedValueSet variable="Tipo_inc_reg">
       <value value="&quot;Nessuno&quot;"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="Budget_Medio_MiliaiaEuro">
@@ -6960,7 +6960,7 @@ NetLogo 5.0.2
     <enumeratedValueSet variable="Percentuale_Interessi_Prestito">
       <value value="4.3"/>
     </enumeratedValueSet>
-    <enumeratedValueSet variable="fr">
+    <enumeratedValueSet variable="Tipo_inc_reg">
       <value value="&quot;Nessuno&quot;"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="Anni_Restituzione_mutuo_banca">
@@ -7117,7 +7117,7 @@ NetLogo 5.0.2
     <enumeratedValueSet variable="BudgetRegione2013">
       <value value="0"/>
     </enumeratedValueSet>
-    <enumeratedValueSet variable="fr">
+    <enumeratedValueSet variable="Tipo_inc_reg">
       <value value="&quot;Nessuno&quot;"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="Anni_Restituzione_mutuo_regione">
@@ -7269,7 +7269,7 @@ NetLogo 5.0.2
     <enumeratedValueSet variable="BudgetRegione2008">
       <value value="0"/>
     </enumeratedValueSet>
-    <enumeratedValueSet variable="fr">
+    <enumeratedValueSet variable="Tipo_inc_reg">
       <value value="&quot;Nessuno&quot;"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="InterBanca">
@@ -7436,7 +7436,7 @@ NetLogo 5.0.2
     <enumeratedValueSet variable="BudgetRegione2009">
       <value value="0"/>
     </enumeratedValueSet>
-    <enumeratedValueSet variable="fr">
+    <enumeratedValueSet variable="Tipo_inc_reg">
       <value value="&quot;Nessuno&quot;"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="Anni_Restituzione_mutuo_regione">

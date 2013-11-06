@@ -2,7 +2,6 @@
 
 import sys
 import getopt
-#import xml.etree.ElementTree as ET
 from lxml import etree as ET
 import subprocess
 import csv
@@ -22,12 +21,12 @@ def setup_exp():
 									"M2_Disposizione=", "Consumo_medio_annuale_KWh=", "Budget_Medio_MiliaiaEuro=", 
 									"Media%_copertura_consumi_richiesta=", "Aumento_%annuo_consumi=",
 									# PV tech and general sim.
-									"Riduzione_anno_%costo_pannello==",
+									"Riduzione_anno_%costo_pannello=",
 									"Perdita_efficienza_annuale_pannello=", "Tecnologia_Pannello=", 
 									"Manutenzione_anno_%costo_totale=", "variazione_annuale_prezzi_elettricita=",
-									"Anni_Restituzione_Prestiti=", "Percentuale_Interessi_Prestito="
+									"Anni_Restituzione_Prestiti=", "Percentuale_Interessi_Prestito=",
 									# regional incentives parameters
-									"fr=", "BudgetRegione=", "BudgetRegione2008=", "BudgetRegione2009=",
+									"Tipo_inc_reg=", "BudgetRegione=", "BudgetRegione2008=", "BudgetRegione2009=",
 									"BudgetRegione2010=", "BudgetRegione2011=", "BudgetRegione2012=","BudgetRegione2013=",
 									"Probfinanz=", "InterBanca=", "Accettato=", "InterRegione=",
 									"Anni_Restituzione_mutuo_regione=", "Anni_Restituzione_mutuo_banca=",
@@ -53,20 +52,30 @@ def setup_exp():
 #	for opt, arg in opts[0]:
 #		instance = str(arg[]) 
 	
-	opts_no_instance = opts[1:]
-#	my_log.write('\nArgument List without instance (opts[1:]): {}'.format(str(opts_no_instance)) )
-#	my_log.write('\nArgument List without instance (sys.argv[2:]): {}'.format(str(sys.argv[2:])) )
 	
-	for experiment in root.iter("experiment"):
-		for enumeratedValueSet in experiment.findall("./enumeratedValueSet"):
-			for opt, arg in opts:
-				if enumeratedValueSet.attrib['variable']==str(opt[2:]):  # cut -- from opt 
-					for parameter in enumeratedValueSet:
-						#print parameter.tag, parameter.attrib
-						my_log.write("\n{}".format(str(opt[2:])))
-						my_log.write("\tOld val:{}".format(str(parameter.attrib)))
-						my_log.write("\tNew val:{}".format(str(arg)))
-						parameter.attrib['value']=arg
+#	for experiment in root.iter("experiment"):
+#		for enumeratedValueSet in experiment.findall("./enumeratedValueSet"):
+#			for opt, arg in opts:
+#				my_log.write("\nI>>>> {}".format(str(opt[2:])))
+#				if enumeratedValueSet.attrib['variable']==str(opt[2:]):  # cut -- from opt 
+#					for parameter in enumeratedValueSet:
+#						#print parameter.tag, parameter.attrib
+#						my_log.write("\nM>>>> {}".format(str(opt[2:])))
+#						my_log.write("\tOld val:{}".format(str(parameter.attrib)))
+#						my_log.write("\tNew val:{}".format(str(arg)))
+#						parameter.attrib['value']=arg
+
+	for opt, arg in opts:
+		for experiment in root.iter("experiment"):
+			my_log.write("\nI>>>> {}".format(str(opt[2:])))
+			for enumeratedValueSet in experiment.xpath("./enumeratedValueSet[@variable='{}']".format(str(opt[2:]))):
+				my_log.write("\nE>>>> {}".format(str(opt[2:])))
+				for parameter in enumeratedValueSet:
+					#print parameter.tag, parameter.attrib
+					my_log.write("\nM>>>> {}".format(str(opt[2:])))
+					my_log.write("\tOld val:{}".format(str(parameter.attrib)))
+					my_log.write("\tNew val:{}".format(str(arg)))
+					parameter.attrib['value']=arg
 			
 	with open("../netlogo_experiment_setup.xml", 'w') as f:
 		f.write(ET.tostring(tree, encoding="UTF-8",
@@ -74,7 +83,7 @@ def setup_exp():
 		                 pretty_print=True,
 		                 doctype='<!DOCTYPE experiments SYSTEM "behaviorspace.dtd">'))
 	
-	                 
+# MUST BE MODIFIED ----> the sim result (csv file) has to be scaled: if not, the bigger values of yearly kW would be preferred since they are closer to the much higher values taken from real data, thus masking the comparison between the real and the simulated trend 
 def eval_results():
 	# least square fitting
 	# regional yearly PV kW produced - for plant of class 1 and 2
@@ -96,8 +105,8 @@ if __name__ == '__main__':
 	with open("/media/sda4/ePolicy/simFineTuning/tuning/my_log", 'a') as my_log:
 		my_log.write("\n --------- netlogo_exp_sim starts -----------\n") 
 		setup_exp()
-		my_log.write("\n ----------- setup_exp() completed ------------ \n")
-		subprocess.call(["/media/sda4/netlogo-5.0.2/netlogo-headless.sh","--model","/media/sda4/ePolicy/simulationModel/SimModel_extCE.nlogo","--setup-file","/media/sda4/ePolicy/simFineTuning/netlogo_experiment_setup.xml","--experiment","simple_run"])
-		my_log.write("-----------  netlogo called -------------\n")
-		eval_results()
-		my_log.write("-----------  eval_results() completed --------\n")
+#		my_log.write("\n ----------- setup_exp() completed ------------ \n")
+#		subprocess.call(["/media/sda4/netlogo-5.0.2/netlogo-headless.sh","--model","/media/sda4/ePolicy/simulationModel/SimModel_extCE.nlogo","--setup-file","/media/sda4/ePolicy/simFineTuning/netlogo_experiment_setup.xml","--experiment","simple_run"])
+#		my_log.write("-----------  netlogo called -------------\n")
+#		eval_results()
+#		my_log.write("-----------  eval_results() completed --------\n")

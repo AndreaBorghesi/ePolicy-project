@@ -1,18 +1,23 @@
-#!/usr/local/bin/python
+#!/usr/bin/python
 
 import sys
 import getopt
 #import xml.etree.ElementTree as ET
 from lxml import etree as ET
 import subprocess
+import csv
 
 def setup_exp():
+	my_log.write("Inside setup_exp()\n")
+	my_log.write("Number of arguments: {}".format(len(sys.argv)))
+	my_log.write('\nArgument List: {}'.format(str(sys.argv)) )
 	tree = ET.parse("../netlogo_experiment_setup.xml")
 	root = tree.getroot()
-
-	# command line arguments MUST be passed only as long flags (--opt arg)
+	my_log.write("\nxml setup opened\n")
+	
+	# parameters MUST be passed only as long flags (--opt arg)
 	try:
-		opts, args = getopt.getopt(sys.argv[1:], "", [
+		opts, args = getopt.getopt(sys.argv[1:], "i:", [
 									# agent '0' parameters
 									"M2_Disposizione=", "Consumo_medio_annuale_KWh=", "Budget_Medio_MiliaiaEuro=", 
 									"Media%_copertura_consumi_richiesta=", "Aumento_%annuo_consumi=",
@@ -39,15 +44,28 @@ def setup_exp():
 									# "Incentivi_Dinamici=", "Incentivi_Installazione=",
 									# "Irradiazione_media_annua_kwh_kwp=", "Costo_Medio_kwP=",
 									])
+		my_log.write("Args parsed correctly\n")
 	except getopt.GetoptError:
+		my_log.write("Args parsing failed\n")
 		sys.exit(2)
 
+	# get instance number
+#	for opt, arg in opts[0]:
+#		instance = str(arg[]) 
+	
+	opts_no_instance = opts[1:]
+#	my_log.write('\nArgument List without instance (opts[1:]): {}'.format(str(opts_no_instance)) )
+#	my_log.write('\nArgument List without instance (sys.argv[2:]): {}'.format(str(sys.argv[2:])) )
+	
 	for experiment in root.iter("experiment"):
 		for enumeratedValueSet in experiment.findall("./enumeratedValueSet"):
 			for opt, arg in opts:
 				if enumeratedValueSet.attrib['variable']==str(opt[2:]):  # cut -- from opt 
 					for parameter in enumeratedValueSet:
-						print parameter.tag, parameter.attrib
+						#print parameter.tag, parameter.attrib
+						my_log.write("\n{}".format(str(opt[2:])))
+						my_log.write("\tOld val:{}".format(str(parameter.attrib)))
+						my_log.write("\tNew val:{}".format(str(arg)))
 						parameter.attrib['value']=arg
 			
 	with open("../netlogo_experiment_setup.xml", 'w') as f:
@@ -55,9 +73,31 @@ def setup_exp():
 		                 xml_declaration=True,
 		                 pretty_print=True,
 		                 doctype='<!DOCTYPE experiments SYSTEM "behaviorspace.dtd">'))
-
+	
+	                 
+def eval_results():
+	# least square fitting
+	# regional yearly PV kW produced - for plant of class 1 and 2
+	kW = [3230, 11115, 16267, 39467, 85438, 69839]
+	with open("/media/sda4/ePolicy/simulationModel/output/kW_CE.csv", 'rb') as csvfile:
+		reader = csv.reader(csvfile)
+		for row in reader:
+			i = 0
+			sum_res = 0
+			for col in row: 
+				if i<6: # since in the csv file the last column is for 2013 values
+					# square residuals
+					sum_res += ((kW[i]-float(col)) ** 2)
+				i+=1
+		print sum_res
 
 
 if __name__ == '__main__':
-	setup_exp()
-	subprocess.call(["/media/sda4/netlogo-5.0.2/netlogo-headless.sh","--model","/media/sda4/ePolicy/simulationModel/SimModel_extCE.nlogo","--setup-file","/media/sda4/ePolicy/simFineTuning/netlogo_experiment_setup.xml","--experiment","simple_run"])
+	with open("/media/sda4/ePolicy/simFineTuning/tuning/my_log", 'a') as my_log:
+		my_log.write("\n --------- netlogo_exp_sim starts -----------\n") 
+		setup_exp()
+		my_log.write("\n ----------- setup_exp() completed ------------ \n")
+		subprocess.call(["/media/sda4/netlogo-5.0.2/netlogo-headless.sh","--model","/media/sda4/ePolicy/simulationModel/SimModel_extCE.nlogo","--setup-file","/media/sda4/ePolicy/simFineTuning/netlogo_experiment_setup.xml","--experiment","simple_run"])
+		my_log.write("-----------  netlogo called -------------\n")
+		eval_results()
+		my_log.write("-----------  eval_results() completed --------\n")

@@ -17,8 +17,8 @@
 # This hook should print one numerical value: the cost that must be minimized.
 # Exit with 0 if no error, with 1 in case of error
 ###############################################################################
-EXE=/media/sda4/ePolicy/simFineTuning/netlogo_exp_sim
-FIXED_PARAMS="--model /media/sda4/ePolicy/simulationModel/SimModel_extCE.nlogo"
+EXE=/media/sda4/ePolicy/simFineTuning/tuning/netlogo_exp_sim
+FIXED_PARAMS=""
 INSTANCE=$1
 CANDIDATE=$2
 shift 2 || exit 1
@@ -27,21 +27,23 @@ CAND_PARAMS=$*
 STDOUT=c${CANDIDATE}.stdout
 STDERR=c${CANDIDATE}.stderr
 
-$EXE ${FIXED_PARAMS} -i $INSTANCE ${CAND_PARAMS} 1> ${STDOUT} 2> ${STDERR}
+ $EXE ${FIXED_PARAMS} -i $INSTANCE ${CAND_PARAMS} 1> ${STDOUT} 2> ${STDERR}
+#$EXE ${FIXED_PARAMS} -i $INSTANCE ${CAND_PARAMS} 1 | tee "/media/sda4/ePolicy/simFineTuning/tuning/my_log" ${STDOUT} 2> ${STDERR}
 
 error() {
     echo "`TZ=UTC date`: error: $@"
     exit 1
 }
 
-# # This may be used to introduce a delay if there are filesystem
-# # issues.
-# SLEEPTIME=1
-# while [ ! -s "${STDOUT}" ]; do
-#     sleep $SLEEPTIME
-#     let "SLEEPTIME += 1"
-# done
+ # This may be used to introduce a delay if there are filesystem
+ # issues.
+ SLEEPTIME=1
+ while [ ! -s "${STDOUT}" ]; do
+     sleep $SLEEPTIME
+     let "SLEEPTIME += 1"
+ done
 
+# The base version should be ok: we want to minimize the least squares sum, we define it as COST and irace tries to minimize it 
 # This is an example of reading a number from the output.
 # It assumes that the objective value is the first number in
 # the first column of the only line starting with a digit.

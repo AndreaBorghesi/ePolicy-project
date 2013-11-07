@@ -277,7 +277,7 @@ to go
     export-output (word "Output/Simulazione "random 10000 " con agenti " NumeroAgenti" Variazione Incentivi produzione "Varia_Tariffe_Incetivanti " Percentuale " %_Variazione_Tariffe" Incentivi_Installazione " Incentivi_Installazione".txt")
     
     ;; output per testare lettura di esperimento da file xml
-    output-print (word "Raggio interazione: " Raggio " ---- Sensibilità interazione: " Sensibilita)
+    ;; output-print (word "Raggio interazione: " Raggio " ---- Sensibilità interazione: " Sensibilita)
     
     ;;produco file utile per l'ottimizzatore
     ;;write_pl_file
@@ -978,7 +978,7 @@ to genera_pf
         ]
         [
           let ra random 101;per vedere se la banca accetta
-          ifelse Tipo_inc_reg = "Conto interessi" and ra < Accettato;la regione paga gli interessi dei mutui, l'agente paga la stessa cifra, ma a rate
+          ifelse Tipo_inc_reg = "Conto_interessi" and ra < Accettato;la regione paga gli interessi dei mutui, l'agente paga la stessa cifra, ma a rate
           [            
             set %ostinazione %ostinazione +  InfluenzaRate ;se pago a rate sono più interessato
             set iregg (costo_impianto * InterBanca / 100 );quanto sborsa la regione
@@ -1161,7 +1161,7 @@ to muori
           set BudgetCorrente BudgetCorrente + ifin;ripristino situazione precedente
         ]
         [
-          ifelse Tipo_inc_reg = "Conto interessi"
+          ifelse Tipo_inc_reg = "Conto_interessi"
             [
               set BudgetCorrente BudgetCorrente + iregg
             ]     
@@ -4342,11 +4342,11 @@ Incentivi regionali
 CHOOSER
 16
 798
-154
+177
 843
 Tipo_inc_reg
 Tipo_inc_reg
-"Nessuno" "Asta" "Conto interessi" "Rotazione" "Garanzia"
+"Nessuno" "Asta" "Conto_interessi" "Rotazione" "Garanzia"
 0
 
 SLIDER

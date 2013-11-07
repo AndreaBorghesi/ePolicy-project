@@ -1,24 +1,24 @@
 import sys
 import getopt
-import xml.etree.ElementTree as ET
+from lxml import etree as ET
 
-tree = ET.parse("netlogo_experiment_setup.xml")
+tree = ET.parse("./netlogo_experiment_setup.xml")
 root = tree.getroot()
 
-# command line arguments MUST be passed only as long flags (--opt arg)
+# parameters MUST be passed only as long flags (--opt arg)
 try:
-	opts, args = getopt.getopt(sys.argv[1:], "", [
+	opts, args = getopt.getopt(sys.argv[1:], "i:c:", [
 								# agent '0' parameters
 								"M2_Disposizione=", "Consumo_medio_annuale_KWh=", "Budget_Medio_MiliaiaEuro=", 
 								"Media%_copertura_consumi_richiesta=", "Aumento_%annuo_consumi=",
 								# PV tech and general sim.
-								"Riduzione_anno_%costo_pannello==",
+								"Riduzione_anno_%costo_pannello=",
 								"Perdita_efficienza_annuale_pannello=", "Tecnologia_Pannello=", 
 								"Manutenzione_anno_%costo_totale=", "variazione_annuale_prezzi_elettricita=",
-								"Anni_Restituzione_Prestiti=", "Percentuale_Interessi_Prestito="
+								"Anni_Restituzione_Prestiti=", "Percentuale_Interessi_Prestito=",
 								# regional incentives parameters
-								"fr=", "BudgetRegione=", "BudgetRegione2008=", "BudgetRegione2009=",
-								"BudgetRegione2010=", "BudgetRegione2011=", "BudgetRegione2012=", "BudgetRegione2013=",
+								"Tipo_inc_reg=", "BudgetRegione=", "BudgetRegione2008=", "BudgetRegione2009=",
+								"BudgetRegione2010=", "BudgetRegione2011=", "BudgetRegione2012=","BudgetRegione2013=",
 								"Probfinanz=", "InterBanca=", "Accettato=", "InterRegione=",
 								"Anni_Restituzione_mutuo_regione=", "Anni_Restituzione_mutuo_banca=",
 								"FallimentoMutuo=", "PercMin=", "PercMax=", "InfluenzaRate=",
@@ -34,17 +34,27 @@ try:
 								# "Incentivi_Dinamici=", "Incentivi_Installazione=",
 								# "Irradiazione_media_annua_kwh_kwp=", "Costo_Medio_kwP=",
 								])
-except getopt.GetoptError:
+except getopt.GetoptError, e:
+	print "Error: {}\n".format(str(e.msg))
 	sys.exit(2)
 
-for node in root.findall("./enumeratedValueSet"):
-	for opt, arg in opts:
-		if node.attrib['variable']==str(opt[2:]):  # cut -- from opt 
-			for parameter in node:
-				print parameter.tag, parameter.attrib
-				parameter.attrib['value']=arg
+for opt, arg in opts:
+	if opt == "-c":
+		nrun=arg
+		print nrun
+	else:
+		for experiment in root.iter("experiment"):
+			for enumeratedValueSet in experiment.xpath("./enumeratedValueSet[@variable='{}']".format(str(opt[2:]))):
+				for parameter in enumeratedValueSet:
+					if (opt[2:] == "Tecnologia_Pannello") or (opt[2:] == "Tipo_inc_reg") or (opt[2:] == "Tipo_variazione_conoscenza_PV"):
+						parameter.attrib['value']="\"{}\"".format(arg)
+					else:
+						parameter.attrib['value']=arg
 			
-tree.write("netlogo_experiment_setup.xml")
+#with open("./netlogo_experiment_setup_{}.xml".format(str(nrun)), 'w+') as f:
+#	f.write(ET.tostring(tree, encoding="UTF-8",
+#	                 xml_declaration=True,
+#	                 pretty_print=True,
+#	                 doctype='<!DOCTYPE experiments SYSTEM "behaviorspace.dtd">'))
 			
-
 

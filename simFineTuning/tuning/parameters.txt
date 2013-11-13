@@ -30,7 +30,7 @@ Consumo_medio_annuale_KWh "--Consumo_medio_annuale_KWh " i (2500, 20000)
 Budget_Medio_MiliaiaEuro "--Budget_Medio_MiliaiaEuro " i (10, 200)
 M2_Disposizione "--M2_Disposizione " i (8, 200)
 Media_copertura_consumi_richiesta "--Media%_copertura_consumi_richiesta " i (0, 100)
-Aumento_annuo_consumi "--Aumento_%annuo_consumi " c (-1.0, -0.5, 0.0, 0.2, 0.4, 0.6, 0.8, 1.0)
+Aumento_annuo_consumi "--Aumento_%annuo_consumi " c (-1, -0.8, -0.5, -0.2, 0, 0.2, 0.5, 0.7, 0.9)
 
 # PV tech and general sim.
 Riduzione_anno_costo_pannello "--Riduzione_anno_%costo_pannello " c (0.1, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4)

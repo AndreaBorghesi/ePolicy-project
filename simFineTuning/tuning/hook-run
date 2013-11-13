@@ -49,7 +49,11 @@ error() {
 # the first column of the only line starting with a digit.
 if [ -s "${STDOUT}" ]; then
     COST=$(cat ${STDOUT} | grep -e '^[[:space:]]*[+-]\?[0-9]' | cut -f1)
-    echo "$COST"
+    if [ -z "$COST" ]; then
+    	echo 99999999999
+    else
+    	echo "$COST"
+    fi
     rm -f "${STDOUT}" "${STDERR}"
     exit 0
 else

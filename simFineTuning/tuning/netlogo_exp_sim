@@ -85,12 +85,14 @@ def eval_results():
 	filename = "/media/sda4/ePolicy/simulationModel/output/kW_CE.csv"
 	# regional yearly PV kW produced - for plant of class 1 and 2
 	kW_base = [3230, 11115, 16267, 39467, 85438, 69839]  # real data
+	kw_2006 = 806 # real value needed to interpolate 2007 first semester kW
 	# interpolate some values in order to obtain more data
-	kW = [0,0,0,0,0,0,0,0,0,0,0]  # interpolated values
+	kW = [0,0,0,0,0,0,0,0,0,0,0,0]  # interpolated values
 	sum_res = 0
-	sum_kw = [0,0,0,0,0,0]  
-	avg_kw_base = [0,0,0,0,0,0]  # average values of simulated kw
-	avg_kw = [0,0,0,0,0,0,0,0,0,0,0] # interpolated vaues for simulation results
+	sum_kw = [0,0,0,0,0,0,0,0,0,0,0,0]  
+	# avg_kw_base = [0,0,0,0,0,0]  # average values of simulated kw
+	# avg_kw = [0,0,0,0,0,0,0,0,0,0,0] # interpolated vaues for simulation results
+    	avg_kw = [0,0,0,0,0,0,0,0,0,0,0,0] # average values of simulated kw for semester
 	i = 0 
 	scale_factor = 10 # tentative value --------> TODO
 	with open(filename, 'rb') as csvfile:
@@ -100,38 +102,40 @@ def eval_results():
 		for row in reader:
 			col_count = 0
 			for col in row: 
-				if col_count<6: # since in the csv file the last column is for 2013 values
+				if col_count<12: # since in the csv file the last 2 columns are for 2013 values
 					sum_kw[col_count]+=float(col)
 					# sum_res += ((kW[col_count]-float(col)) ** 2)
 				col_count+=1
 			row_count+=1
-			
-		# compute average simulated kw values
-		for avg_val in avg_kw_base:
-			avg_kw_base[i]=int(sum_kw[i]/row_count)
-			i+=1
+					
+		# compute average simulated kw values 
+		for avg_val in avg_kw:
+		    avg_kw[i]=int(sum_kw[i]/row_count)
+		    i+=1
 		
-		#interpolate kw values - real data and simulation results -----> change the
-		# simulator to directly obtain semester values
+		#interpolate kw values - real data 
+		# interpolate firs semester 2007
+		kW[0]=(kW_base[0]-kw_2006)/2
+		# interpolate from second semester 2007 onwards
 		i=0
 		for val in kW_base:
-			kW[i*2]=kW_base[i]
-			avg_kw[i*2]=avg_kw_base[i]
+			kW[i*2+1]=kW_base[i]
+			# avg_kw[i*2]=avg_kw_base[i]
 			if (i<5):
-				kW[i*2+1]=kW_base[i]+(kW_base[i+1]-kW_base[i])/2
-				avg_kw[i*2+1]=avg_kw_base[i]+(avg_kw_base[i+1]-avg_kw_base[i])/2
+				kW[i*2+2]=kW_base[i]+(kW_base[i+1]-kW_base[i])/2
+				# avg_kw[i*2+1]=avg_kw_base[i]+(avg_kw_base[i+1]-avg_kw_base[i])/2
 			i+=1
 			
 		# we compute the least square sum not using the absolute values (this could lead to errors)
 		# but with the yearly percetage increase/decrease compared to a base value (kW of first semester 2007)
-		var_sim_kw_per=[100,0,0,0,0,0,0,0,0,0,0]
-		var_kw_per=[100,0,0,0,0,0,0,0,0,0,0]
+		var_sim_kw_per=[100,0,0,0,0,0,0,0,0,0,0,0]
+		var_kw_per=[100,0,0,0,0,0,0,0,0,0,0,0]
 		i=1
 		for val in kW[1:]:
 			var_sim_kw_per[i]=avg_kw[i]*100/avg_kw[0]
 			var_kw_per[i]=kW[i]*100/kW[0]
 			i+=1
-				
+					
 		# compute sum of square residuals
 		i=0
 		for val in kW:
@@ -151,6 +155,6 @@ if __name__ == '__main__':
 	netlogo_model = "/media/sda4/ePolicy/simulationModel/SimModel_extCE.nlogo"
 	with open(log_file, 'a') as my_log:
 		exp_setup_xml_file_name=setup_exp()
-#		# repeated iteration of netlogo simulation required in order to obtain significative results
+		# repeated iteration of netlogo simulation required in order to obtain significative results
 		subprocess.call([netlogo_headless,"--model",netlogo_model,"--setup-file",exp_setup_xml_file_name,"--experiment","simple_run"])
 		eval_results()

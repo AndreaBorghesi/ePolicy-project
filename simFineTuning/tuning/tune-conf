@@ -39,7 +39,7 @@ hookRun <- "./hook-run"
 ## The maximum number of runs (invocations of hookRun) that will performed. It
 ## determines the (maximum) budget of experiments for the tuning, unless
 ## timeBudget is positive.
-maxExperiments <- 1000
+maxExperiments <- 2000
 
 ## The maximum computation time that should be used for tuning in
 ## seconds. This only works when tuning for time. 0 means no time
@@ -56,7 +56,7 @@ digits <- 2
 
 ## A value of 0 silences all debug messages. Higher values provide
 ## more verbose debug messages.
-debugLevel <- 2
+debugLevel <- 1
 
 ## Number of iterations of Race. Do not use something else than the
 ## default (that is, the dynamic value) unless you know exactly what

@@ -107,6 +107,13 @@ globals [ wacc m2Kwp  count_tick scala_dim_impianto time anno number durata_impi
   ;; variabili per tenere traccia del numero di agenti che falliscono a causa della mancanza di conoscenza
   morti_conoscenza_2007 morti_conoscenza_2008 morti_conoscenza_2009 morti_conoscenza_2010 morti_conoscenza_2012 morti_conoscenza_2013 morti_conoscenza_2011
   morti_conoscenza_2014 morti_conoscenza_2015 morti_conoscenza_2016
+  
+  ;; variabili per tenere traccia dei kw installati ogni semestre
+  kw_2007_1 kw_2007_2 kw_2008_1 kw_2008_2 kw_2009_1 kw_2009_2 kw_2010_1 kw_2010_2 
+  kw_2011_1 kw_2011_2 kw_2012_1 kw_2012_2 kw_2013_1 kw_2013_2
+  ;; variabili per tenere traccia dei numero di impianti installati ogni semestre
+  npf_2007_1 npf_2007_2 npf_2008_1 npf_2008_2 npf_2009_1 npf_2009_2 npf_2010_1 npf_2010_2 
+  npf_2011_1 npf_2011_2 npf_2012_1 npf_2012_2 npf_2013_1 npf_2013_2
 ]
 
 ;; DEFINIZIONE AGENTI E ATTRIBUTI AGENTI
@@ -202,6 +209,8 @@ to setup
   create_ar  ;;procedura per creare un agente associato alla regione, quindi uno solo per simulazione
   create_pf
   aggiorna_kw_semestre
+  aggiorna_info_semestre
+  ;aggiorna_kw_annui
 end
 
 ;; creo un agente che rappresenta la regione e può, ad esempio, modificare il budget annuale
@@ -247,12 +256,23 @@ to go
     ]
     create_pf
     aggiorna_kw_semestre
+    aggiorna_info_semestre
+  ]
+  
+  if(time = 1)
+  [
+    aggiorna_kw_semestre
+    aggiorna_info_semestre
+    set kw_sum 0
   ]
   
   if(time = 2)
   [ 
     aggiorna_kw_annui
     aggiorna_diffusione_conoscenza  ;; ogni il livello di diffusione della conoscenza relativa al fotovoltaico cambia    
+    aggiorna_kw_semestre
+    aggiorna_info_semestre
+    set kw_sum 0
   ]
   
   if (anno = 2014);ora non creo più nulla faccio solo evolvere
@@ -269,6 +289,28 @@ to go
     ;;stampa_resoconto
     update_plot_roe
     update_plot_kw_bars
+    
+    output-print(word "--->> kW 2007 1° semestre: " kw_2007_1)
+    output-print(word "--->> kW 2007 2° semestre: " kw_2007_2)
+    output-print(word "--->> kW 2007: "  (kw_2007_1 + kw_2007_2) "  kW 2007:" kW2007)
+    output-print(word "--->> kW 2008 1° semestre: " kw_2008_1)
+    output-print(word "--->> kW 2008 2° semestre: " kw_2008_2)
+    output-print(word "--->> kW 2008: "  (kw_2008_1 + kw_2008_2) "  kW 2008:" kW2008)
+    output-print(word "--->> kW 2009 1° semestre: " kw_2009_1)
+    output-print(word "--->> kW 2009 2° semestre: " kw_2009_2)
+    output-print(word "--->> kW 2009: "  (kw_2009_1 + kw_2009_2) "  kW 2009:" kW2009)
+    output-print(word "--->> kW 2010 1° semestre: " kw_2010_1)
+    output-print(word "--->> kW 2010 2° semestre: " kw_2010_2)
+    output-print(word "--->> kW 2010: "  (kw_2010_1 + kw_2010_2) "  kW 2010:" kW2010)
+    output-print(word "--->> kW 2011 1° semestre: " kw_2011_1)
+    output-print(word "--->> kW 2011 2° semestre: " kw_2011_2)
+    output-print(word "--->> kW 2011: "  (kw_2011_1 + kw_2011_2) "  kW 2011:" kW2011)
+    output-print(word "--->> kW 2012 1° semestre: " kw_2012_1)
+    output-print(word "--->> kW 2012 2° semestre: " kw_2012_2)
+    output-print(word "--->> kW 2012: "  (kw_2012_1 + kw_2012_2) "  kW 2012:" kW2012)
+    output-print(word "--->> kW 2013 1° semestre: " kw_2013_1)
+    output-print(word "--->> kW 2013 2° semestre: " kw_2013_2)
+    output-print(word "--->> kW 2013: "  (kw_2013_1 + kw_2013_2) "  kW 2013:" kW2013)
     
     ;;print_simulation_info
     output-print (word "--------------------------------------------------------------------------------------------------------------------------------------------------------")
@@ -611,6 +653,36 @@ to set_global
   set morti_conoscenza_2014 0
   set morti_conoscenza_2015 0
   set morti_conoscenza_2016 0
+  
+  set kw_2007_1 0
+  set kw_2007_2 0
+  set kw_2008_1 0
+  set kw_2008_2 0
+  set kw_2009_1 0
+  set kw_2009_2 0
+  set kw_2010_1 0
+  set kw_2010_2 0
+  set kw_2011_1 0
+  set kw_2011_2 0
+  set kw_2012_1 0
+  set kw_2012_2 0
+  set kw_2013_1 0
+  set kw_2013_2 0
+  
+  set npf_2007_1 0
+  set npf_2007_2 0
+  set npf_2008_1 0
+  set npf_2008_2 0
+  set npf_2009_1 0
+  set npf_2009_2 0
+  set npf_2010_1 0
+  set npf_2010_2 0
+  set npf_2011_1 0
+  set npf_2011_2 0
+  set npf_2012_1 0
+  set npf_2012_2 0
+  set npf_2013_1 0
+  set npf_2013_2 0
   
   set kw_sum 0
   set kw_installed_semester 0
@@ -1802,7 +1874,29 @@ end
 ;; aggiorna i nuovi kw installati ogni semestre
 to aggiorna_kw_semestre
   set kw_installed_semester kw_sum
-  set kw_sum 0
+  ;set kw_sum 0
+end
+
+;; aggiorna i nuovi kw installati a livello regionale ogni semestre
+to aggiorna_info_semestre
+  
+    ifelse (anno = 2007 and time = 1)[ set kw_2007_1 kw_installed_semester ][
+    ifelse (anno = 2007 and time = 2)[ set kw_2007_2 kw_installed_semester ][
+    ifelse (anno = 2008 and time = 1)[ set kw_2008_1 kw_installed_semester ][
+    ifelse (anno = 2008 and time = 2)[ set kw_2008_2 kw_installed_semester ][
+    ifelse (anno = 2009 and time = 1)[ set kw_2009_1 kw_installed_semester ][
+    ifelse (anno = 2009 and time = 2)[ set kw_2009_2 kw_installed_semester ][
+    ifelse (anno = 2010 and time = 1)[ set kw_2010_1 kw_installed_semester ][
+    ifelse (anno = 2010 and time = 2)[ set kw_2010_2 kw_installed_semester ][
+    ifelse (anno = 2011 and time = 1)[ set kw_2011_1 kw_installed_semester ][
+    ifelse (anno = 2011 and time = 2)[ set kw_2011_2 kw_installed_semester ][
+    ifelse (anno = 2012 and time = 1)[ set kw_2012_1 kw_installed_semester ][
+    ifelse (anno = 2012 and time = 2)[ set kw_2012_2 kw_installed_semester ][  
+    ifelse (anno = 2013 and time = 1)[ set kw_2013_1 kw_installed_semester ][
+    ifelse (anno = 2013 and time = 2)[ set kw_2013_2 kw_installed_semester ][  
+      ;; default case 
+    ]]]]]]]]]]]]]]
+    
 end
 
 ;; modifica ogni anno il grado di diffusione della conoscenza relativa al fotovoltaico
@@ -3388,7 +3482,7 @@ end
 to write_kW_CE_file
   file-open "/media/sda4/ePolicy/simulationModel/output/kW_CE.csv"
   ;; i valori presenti in ogni riga sono: kW 2007, kW 2008, kW 2009, kW 2010, kW 2011, kW 2012, kW 2013,
-  file-print (word kW2007 ", " kW2008 ", " kW2009 ", " kW2010 ", " kW2011 ", " kW2012 ", " kW2013)
+;  file-print (word kW2007 ", " kW2008 ", " kW2009 ", " kW2010 ", " kW2011 ", " kW2012 ", " kW2013)
   
   ;; ora stampo i kw annuali divisi per classe di potenza (fasce potenza 1,2,3)
 ;  file-print (word kW_1FP_2007 ", " kW_1FP_2008 ", " kW_1FP_2009 ", " kW_1FP_2010 ", " kW_1FP_2011 ", " kW_1FP_2012 ", " kW_1FP_2013 ", "
@@ -3400,7 +3494,10 @@ to write_kW_CE_file
 ;    kW_2FP_2007 ", " kW_2FP_2008 ", " kW_2FP_2009 ", " kW_2FP_2010 ", " kW_2FP_2011 ", " kW_2FP_2012 ", " kW_2FP_2013 ", "
 ;    kW_3FP_2007 ", " kW_3FP_2008 ", " kW_3FP_2009 ", " kW_3FP_2010 ", " kW_3FP_2011 ", " kW_3FP_2012 ", " kW_3FP_2013 ", "
 ;    kW2007 ", " kW2008 ", " kW2009 ", " kW2010 ", " kW2011 ", " kW2012 ", " kW2013 )
-;  
+  
+  ;; stampo i valori di kW simulati ogni semestre
+  file-print (word kw_2007_1 ", " kw_2007_2 ", " kw_2008_1 ", " kw_2008_2 ", " kw_2009_1 ", " kw_2009_2 ", " kw_2010_1 ", " kw_2010_2 ", " kw_2011_1 ", " kw_2011_2 ", " kw_2012_1 ", " kw_2012_2 ", " kw_2013_1 ", " kw_2013_2)
+  
   file-close
   
 end
@@ -3858,7 +3955,7 @@ NumeroAgenti
 NumeroAgenti
 1
 250
-200
+100
 1
 1
 NIL

@@ -37,7 +37,9 @@ def setup_exp():
 									"ROE_minimo_desiderato=",
 									# knowledge diffusion
 									"Tipo_variazione_conoscenza_PV=", "Diffusione_Conoscenza_Iniziale=", 
-									"Coeff_Variazione_Diffusione="
+									"Coeff_Variazione_Diffusione=",
+									# incentives forecasts
+									"ImportanzaProspettive="
 									# simulation parameters that could be considered later
 									# "NumeroAgenti=", "%_Incentivi_Installazione=", "Tasso_lordo_rendimento_BOT=",
 									# "Incentivi_Dinamici=", "Incentivi_Installazione=",
@@ -80,7 +82,6 @@ def setup_exp():
 	return exp_setup_xml_file_name
 	
 	
-# MUST BE MODIFIED ----> the sim result (csv file) has to be scaled: if not, the bigger values of yearly kW would be preferred since they are closer to the much higher values taken from real data, thus masking the comparison between the real and the simulated trend 
 def eval_results():
 	filename = "/media/sda4/ePolicy/simulationModel/output/kW_CE.csv"
 	# regional yearly PV kW produced - for plant of class 1 and 2
@@ -141,19 +142,23 @@ def eval_results():
 		for val in kW:
 			sum_res += ((var_kw_per[i]-var_sim_kw_per[i]) ** 2)		
 			i+=1	
+		
+		print var_kw_per
+		print var_sim_kw_per
 				
 	# delete kW file content
 	f = open(filename, "w+")
 	f.close()
 	# return metric
-	print sum_res
-
+	print sum_res	
+ 
 
 if __name__ == '__main__':
 	log_file = "/media/sda4/ePolicy/simFineTuning/tuning/my_log"
 	netlogo_headless = "/media/sda4/netlogo-5.0.2/netlogo-headless.sh"
-	netlogo_model = "/media/sda4/ePolicy/simulationModel/SimModel_extCE.nlogo"
-	with open(log_file, 'a') as my_log:
+#	netlogo_model = "/media/sda4/ePolicy/simulationModel/SimModel_extCE.nlogo"  ---> without incentives forecasts
+        netlogo_model = "/media/sda4/ePolicy/simulationModel/SimModel_previsioneInc.nlogo"
+        with open(log_file, 'a') as my_log:
 		exp_setup_xml_file_name=setup_exp()
 		# repeated iteration of netlogo simulation required in order to obtain significative results
 		subprocess.call([netlogo_headless,"--model",netlogo_model,"--setup-file",exp_setup_xml_file_name,"--experiment","simple_run"])

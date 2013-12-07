@@ -114,6 +114,8 @@ globals [ wacc m2Kwp  count_tick scala_dim_impianto time anno number durata_impi
   ;; variabili per tenere traccia dei numero di impianti installati ogni semestre
   npf_2007_1 npf_2007_2 npf_2008_1 npf_2008_2 npf_2009_1 npf_2009_2 npf_2010_1 npf_2010_2 
   npf_2011_1 npf_2011_2 npf_2012_1 npf_2012_2 npf_2013_1 npf_2013_2
+  
+  importanza_previsioni ;; indica il peso che le prospettive sui futuri incentivi hanno sulla decisione di effettuare realizzare un impianto PV
 ]
 
 ;; DEFINIZIONE AGENTI E ATTRIBUTI AGENTI
@@ -163,6 +165,9 @@ pf-own [id consumo_medio_annuale budget %cop_cosumi M2disposizione dimensione_im
   flag_sum_roe_morti
   flag_sum_roe_stimato_morti
   
+  presente_VS_prospettive ;; parametetro di ogni agente che aumenta o diminuisce la probabilità di realizzare 
+                        ;; un impianto in base all'andamento previsto degli incentivi -- vedi valuta_prospettive_future
+  prev_tariffa_incentivante prev_tariffa_autoconsumo prev_tariffa_omnicomprensiva  ;; tariffe previste 
 ]
  
 breed [ar] ;; ar-> agente unico che rappresenta la regione
@@ -692,6 +697,8 @@ to set_global
   set percentuale_conoscenza_PV Diffusione_Conoscenza_Iniziale
   set coeff_variazione_conoscenza_PV Coeff_Variazione_Diffusione
   
+  set importanza_previsioni ImportanzaProspettive
+  
   set NAgentiFINAL NumeroAgenti;quanti crearne per semestre
   
   ifelse (Tecnologia_Pannello = "Monocristallini"  )
@@ -903,6 +910,7 @@ to create_pf
         set flag_roe false 
         set flag_sum_roe_morti false
         set flag_sum_roe_stimato_morti false
+        set presente_VS_prospettive 1
         
         set influenza 0
         elimina_sovrapposizioni;im modo che le case non siano una sopra laltra
@@ -917,7 +925,7 @@ to create_pf
         ;; la valuatazione della fattibilità dell'impianto avviense solamente se l'agente è a conoscenza delle possibilità offerte dal PV --> in particolare ogni agente genera
         ;; un numero casuale e lo confronta con il valore della percentuale di conoscenza
         let prob_conoscenza random 101
-        ifelse ( prob_conoscenza <= percentuale_conoscenza_PV ) ;; l'agente è a conoscenza
+        ifelse ( prob_conoscenza <= percentuale_conoscenza_PV ) ;; l'agente è a conoscenza 
         [
           ;; valutazione fattibilità impianto versione iniziale (Croce+Cerri)
           valuta_fattibilita_impianto;se farà l'impianto con gli incentivi regionali o no??
@@ -1151,6 +1159,7 @@ to valuta_fattibilita_impianto
       ;; calcola_tariffa_gse  ;;Vecchia versione senza CE
       ;; calcola_prezzi_minimi_gse
       calcola_tariffe_ce
+      calcola_tariffa_futura
       
       stima_roe
       ;; decisione presa anche sulla base del roe stimato: se è minore di quello minimo l'agente non realizza l'impianto
@@ -1179,6 +1188,7 @@ to valuta_fattibilita_impianto
           ;; voglio stimare il roe anche nel caso in cui il pf non venga realizzato, per stabilire quale sia il metodo migliore per valutare la fattibilità del'impianto
           calcola_fascia_potenza
           calcola_tariffe_ce
+          calcola_tariffa_futura
           stima_roe
           
           ifelse valutaincentivi = false
@@ -1374,7 +1384,7 @@ end
 to accetta_ridimensionamento
   let dimensione_eccedenza dimensione_impianto - M2disposizione
   ;; output-print  (word   " Ridimensionamento ************** AGENTE " id  " dim_im: " dimensione_impianto " m2 disposizione: " M2disposizione " costo im: " costo_impianto " budget " budget "dim_ecc; " dimensione_eccedenza ) 
-  ifelse (dimensione_eccedenza <= round ( ( M2disposizione * ( %ostinazione + influenza * sensibilita )) / 100 ) )
+  ifelse (dimensione_eccedenza <= round ( ( M2disposizione * ( %ostinazione + influenza * sensibilita ) * (presente_VS_prospettive * importanza_previsioni)) / 100 ) ) ;; (valore modificato anche in base alle prospettive future)
     [
       ;;set size dimensione_impianto / scala_dim_impianto
       set color blue
@@ -1384,6 +1394,7 @@ to accetta_ridimensionamento
       calcola_costi_impianto
       calcola_fascia_potenza
       calcola_tariffe_ce
+      calcola_tariffa_futura
       ;; calcola_tariffa_gse vecchia versione senza CE
       stima_roe
       ;; decisione presa anche sulla base del roe stimato: se è minore di quello minimo l'agente non realizza l'impianto
@@ -1407,6 +1418,7 @@ to accetta_ridimensionamento
     ] 
     [
       calcola_tariffe_ce
+      calcola_tariffa_futura
       calcola_fascia_potenza
       stima_roe
       if valutaincentivi = false 
@@ -1439,8 +1451,8 @@ end
 ;; VALUTAZIONE IPOTESI PRESTITO
 to accetta_prestito
   let Sforo_Budget (costo_impianto - ifin + intRegione) - Budget
-  ifelse (Sforo_Budget <= round ( ( Budget * ( %ostinazione + influenza * sensibilita )) / 100 ) )
-    [
+  ifelse (Sforo_Budget <= round ( ( Budget * ( %ostinazione + influenza * sensibilita) * (presente_VS_prospettive * importanza_previsioni)) / 100 ) ) ;; (valore modificato anche in base alle prospettive future)
+    [ 
       ;;set size dimensione_impianto / scala_dim_impianto
       set color red
       set prestito true
@@ -1450,6 +1462,7 @@ to accetta_prestito
       calcola_fascia_potenza
       ;; calcola_tariffa_gse versione senza CE
       calcola_tariffe_ce
+      calcola_tariffa_futura
       stima_roe
       ;; decisione presa anche sulla base del roe stimato: se è minore di quello minimo l'agente non realizza l'impianto
       ifelse (roe_stimato > roe_minimo)[ ;; impianto realizzabile
@@ -1472,6 +1485,7 @@ to accetta_prestito
     ] 
     [
       calcola_tariffe_ce
+      calcola_tariffa_futura
       calcola_fascia_potenza
       stima_roe
       if valutaincentivi = false
@@ -3014,7 +3028,209 @@ end
 
 ;; procedura tramite cui ogni agente stima come varierà nel futuro la situazione degli incentivi (per ora solamente nazionali) 
 to valuta_prospettive_future
-  
+  let diff_tariffe_perc 0
+  let diff_tariffe_perc_A 0
+  let diff_tariffe_perc_O 0
+  calcola_tariffa_futura
+  ; confronta la tariffa vigente con quella futura
+  ifelse(prev_tariffa_incentivante = "Non prevista")
+  [;; quinto CE
+    set diff_tariffe_perc_A (prev_tariffa_autoconsumo - tariffa_autoconsumo) * 100 / tariffa_autoconsumo
+    set diff_tariffe_perc_O (prev_tariffa_omnicomprensiva - tariffa_omnicomprensiva) * 100 / tariffa_omnicomprensiva
+    set diff_tariffe_perc (diff_tariffe_perc_A + diff_tariffe_perc_O) / 2
+  ]
+  [;; 2,3,4 CE
+    set diff_tariffe_perc (prev_tariffa_incentivante - tariffa_incentivante) * 100 / tariffa_incentivante
+  ]
+  ifelse (diff_tariffe_perc < 0) ;; le tariffe diminuiranno in futuro
+  [;; quando le tariffe diminuiscono conviene maggiormente investire subito
+    set presente_VS_prospettive presente_VS_prospettive + diff_tariffe_perc / 100
+  ]
+  [;; le tariffe aumenteranno in futuro (quando mai? caso storicamente non verificatosi in Italia) -- potrebbe convenire aspettare a realizzare l'impianto
+     set presente_VS_prospettive presente_VS_prospettive - diff_tariffe_perc / 100
+  ]
+end
+
+;; calcolo della tariffa per il semestre successivo a quello di esecuzione dell'agente
+to calcola_tariffa_futura
+  ;; implementazione ai limiti del criminale --> esattamente lo stesso codice di calcola_tariffe_CE traslato temporalmente in modo che ogni agente guardi nei file delle tariffe 
+  ;; quale sarà quella relativa al semestre successivo a quello di esecuzione
+  ifelse( ( anno_realizzazione = 2007 or anno_realizzazione = 2008 ) and file-exists? "SecondoCE_inc2009.txt" ) 
+  [;; 2007-2008
+    set prev_tariffa_autoconsumo "Non prevista"
+    set  prev_tariffa_omnicomprensiva "Non prevista"
+    let count_t 0
+    file-open "SecondoCE_inc2009.txt"
+    while [ not file-at-end? ] 
+    [ ;; legge da file finché non trova la tariffa relativa alla fascia di potenza corretta
+      let letto file-read
+      set count_t count_t + 1
+      if (count_t = fascia_potenza )
+      [
+        set  prev_tariffa_incentivante  letto
+      ]          
+    ]
+    file-close
+  ];; fine 2007-2008
+  [;; else 2009-2013
+    ifelse( anno_realizzazione = 2009 and file-exists? "SecondoCE_inc2010-11.txt" )
+    [;; 2009
+      set prev_tariffa_autoconsumo "Non prevista"
+      set  prev_tariffa_omnicomprensiva "Non prevista"
+      let count_t 0
+      file-open "SecondoCE_inc2010-11.txt"
+      while [ not file-at-end? ]
+      [ ;; legge da file finché non trova la tariffa relativa alla fascia di potenza corretta
+        let letto file-read
+        set count_t count_t + 1
+        if (count_t = fascia_potenza )
+        [
+          set  prev_tariffa_incentivante  letto
+        ]       
+      ]
+      file-close
+    ];; fine 2009
+    [;; 2010-2013
+      ifelse( anno_realizzazione = 2010 or ( anno_realizzazione = 2011 and semestre_realizzazione = 1) )
+      [;; 2010 e 1 semestre 2011
+        ;; nel primo semestre del 2011 coesistono agenti con il Secondo ed il Terzo CE
+        ifelse( conto_energia = 2 and file-exists? "QuartoCE_inc2011.txt")
+        [;; secondo conto energia
+           set prev_tariffa_autoconsumo "Non prevista"
+           set  prev_tariffa_omnicomprensiva "Non prevista"
+           let count_t 0
+           file-open "QuartoCE_inc2011.txt"
+           while [ not file-at-end? ]
+           [ ;; legge da file finché non trova la tariffa relativa alla fascia di potenza corretta
+             let letto file-read
+             set count_t count_t + 1
+             if (count_t = fascia_potenza )
+             [
+               set  prev_tariffa_incentivante  letto
+             ]             
+           ]
+           file-close
+        ];; fine secondo conto energia
+        [;; terzo conto energia
+          if(file-exists? "QuartoCE_inc2011.txt")
+          [
+             set prev_tariffa_autoconsumo "Non prevista"
+             set  prev_tariffa_omnicomprensiva "Non prevista"
+             let count_t 0
+             file-open "QuartoCE_inc2011.txt"
+             while [ not file-at-end? ]
+             [ ;; legge da file finché non trova la tariffa relativa alla fascia di potenza corretta
+                  let letto file-read
+                  set count_t count_t + 1
+                  if (count_t = fascia_potenza )
+                  [
+                    set  prev_tariffa_incentivante  letto
+                  ]        
+             ]
+             file-close
+          ]
+        ];; fine terzo conto energia
+      ];; fine 2010 e 1 semestre 2011
+      [;; secondo semestre 2011 e 2012-2013
+        ifelse( ( anno_realizzazione = 2011 and semestre_realizzazione = 2) and file-exists? "QuartoCE_inc2012.txt" )
+        [;; secondo semestre 2011
+          set prev_tariffa_autoconsumo "Non prevista"
+          set  prev_tariffa_omnicomprensiva "Non prevista"
+          let count_t 0
+          file-open "QuartoCE_inc2012.txt"
+          while [ not file-at-end? ]
+          [ ;; legge da file finché non trova la tariffa relativa alla fascia di potenza corretta
+             let letto file-read
+             set count_t count_t + 1
+             if (count_t = fascia_potenza )
+             [
+               set  prev_tariffa_incentivante  letto
+             ]       
+          ]
+          file-close
+        ];; fine secondo semestre 2011
+        [;; 2012-2013
+          ifelse( ( anno_realizzazione = 2012 and semestre_realizzazione = 1) and file-exists? "QuintoCE_onni2012.txt" )
+          [;; primo semestre 2012
+            set prev_tariffa_autoconsumo "Non prevista"
+            set  prev_tariffa_omnicomprensiva "Non prevista"
+            let count_t 0
+            file-open "QuintoCE_onni2012.txt"
+            while [ not file-at-end? ]
+            [ ;; legge da file finché non trova la tariffa relativa alla fascia di potenza corretta
+              let letto file-read
+              set count_t count_t + 1
+              if (count_t = fascia_potenza )
+              [
+                set  prev_tariffa_incentivante  letto
+              ]       
+            ]
+            file-close
+          ];; fine primo semestre 2012
+          [;; secondo semestre 2012 e 2013
+            ifelse( ( anno_realizzazione = 2012 and semestre_realizzazione = 2) and file-exists? "QuintoCE_onni2013.txt" and file-exists? "QuintoCE_auto2013.txt" )
+            [ ;; secondo semestre 2012
+              set  prev_tariffa_incentivante "Non prevista"
+              let count_t 0
+              file-open "QuintoCE_auto2013.txt"
+              while [ not file-at-end? ]
+              [ ;; legge da file finché non trova la tariffa relativa alla fascia di potenza corretta
+                 let letto file-read
+                 set count_t count_t + 1
+                 if (count_t = fascia_potenza )
+                 [
+                   set  prev_tariffa_autoconsumo  letto
+                 ]       
+              ]
+              file-close
+              set count_t 0
+              file-open "QuintoCE_onni2013.txt"
+              while [ not file-at-end? ]
+              [ ;; legge da file finché non trova la tariffa relativa alla fascia di potenza corretta
+                 let letto file-read
+                 set count_t count_t + 1
+                 if (count_t = fascia_potenza )
+                 [
+                   set  prev_tariffa_omnicomprensiva  letto
+                 ]         
+              ]
+              file-close
+            ];; fine  secondo semestre 2012
+            [ ;; 2013
+               if( anno_realizzazione = 2013 and file-exists? "QuintoCE_onni2013.txt" and file-exists? "QuintoCE_auto2013.txt" )
+               [
+                 set  prev_tariffa_incentivante "Non prevista"
+                 let count_t 0
+                 file-open "QuintoCE_auto2013.txt"
+                 while [ not file-at-end? ]
+                 [ ;; legge da file finché non trova la tariffa relativa alla fascia di potenza corretta
+                   let letto file-read
+                   set count_t count_t + 1
+                   if (count_t = fascia_potenza )
+                   [
+                     set  prev_tariffa_autoconsumo  letto
+                   ]       
+                 ]
+                 file-close
+                 set count_t 0
+                 file-open "QuintoCE_onni2013.txt"
+                 while [ not file-at-end? ]
+                 [ ;; legge da file finché non trova la tariffa relativa alla fascia di potenza corretta
+                   let letto file-read
+                   set count_t count_t + 1
+                   if (count_t = fascia_potenza )
+                   [
+                     set  prev_tariffa_omnicomprensiva  letto
+                   ]     
+                 ]
+                 file-close
+               ]
+            ] ;; fine 2013
+          ];; fine secondo semestre 2012 e 2013
+        ];; fine 2012-2013
+      ];; fine secondo semestre 2011 e 2012-2013
+    ];; fine 2010-2013
+  ];; fine else 2009-2013
 end
 
 ;; SET UP GRAFICO PBT
@@ -3719,7 +3935,7 @@ Percentuale_Interessi_Prestito
 Percentuale_Interessi_Prestito
 1
 8
-4.3
+7.1
 0.1
 1
 %
@@ -3960,7 +4176,7 @@ NumeroAgenti
 NumeroAgenti
 1
 250
-100
+200
 1
 1
 NIL
@@ -6090,7 +6306,7 @@ ROE_minimo_desiderato
 ROE_minimo_desiderato
 1
 20
-1
+5
 1
 1
 NIL
@@ -6383,7 +6599,7 @@ Diffusione_Conoscenza_Iniziale
 Diffusione_Conoscenza_Iniziale
 0
 100
-100
+2
 1
 1
 NIL
@@ -6528,6 +6744,31 @@ Coeff_Variazione_Diffusione
 Coeff_Variazione_Diffusione
 1
 10
+1.6
+0.1
+1
+NIL
+HORIZONTAL
+
+TEXTBOX
+1116
+669
+1266
+687
+Prospettive Future
+14
+43.0
+1
+
+SLIDER
+1108
+690
+1350
+723
+ImportanzaProspettive
+ImportanzaProspettive
+0
+5.0
 1
 0.1
 1
@@ -7516,6 +7757,9 @@ NetLogo 5.0.2
     </enumeratedValueSet>
     <enumeratedValueSet variable="Raggio">
       <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="ImportanzaProspettive">
+      <value value="1.0"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="Tipo_variazione_conoscenza_PV">
       <value value="&quot;Quadratico&quot;"/>
